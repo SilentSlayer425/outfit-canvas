@@ -131,6 +131,8 @@ npm run build
 npm run test
 ```
 
+> Note: Vitest is configured, but this repository does not currently include test files.
+
 ## Project structure
 
 - `src/pages` — top-level screens
