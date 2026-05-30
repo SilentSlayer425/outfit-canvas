@@ -85,7 +85,12 @@ export function useCloset() {
   const addItem = useCallback((item: NewClothingItemInput) => {
     const createdAt = Date.now();
     const images = item.images?.length
-      ? item.images.map((image) => ({ ...image, createdAt: image.createdAt ?? createdAt }))
+      ? item.images.map((image) => {
+        if (!image.createdAt) {
+          console.warn('Missing createdAt for clothing image.', image.id);
+        }
+        return { ...image, createdAt: image.createdAt ?? createdAt };
+      })
       : item.imageData
         ? [{
           id: crypto.randomUUID(),

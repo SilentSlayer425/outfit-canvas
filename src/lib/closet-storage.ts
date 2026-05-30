@@ -25,13 +25,17 @@ const LEGACY_OUTFITS_KEY = 'closet-outfits';
 
 const ensureImages = (item: ClothingItem): ClothingItem => {
   const hasImages = item.images && item.images.length > 0;
+  const createdAt = item.createdAt ?? Date.now();
+  if (!item.createdAt) {
+    console.warn('Missing createdAt for clothing item during migration.', item.id);
+  }
   const images = hasImages
     ? item.images
     : item.imageData
       ? [{
         id: crypto.randomUUID(),
         data: item.imageData,
-        createdAt: item.createdAt ?? Date.now(),
+        createdAt,
       }]
       : [];
   return {

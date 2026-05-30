@@ -73,7 +73,7 @@ export interface ClothingItem {
   /** User-written description for this item */
   description?: string;
   /** Legacy single-image field (kept for backwards compatibility) */
-  imageData?: string; // optimized image data URL (metadata stripped during processing)
+  imageData?: string;
   /** Multi-image support */
   images?: ClothingImage[];
   /** Primary image id when multiple images exist */
