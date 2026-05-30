@@ -87,7 +87,7 @@ export function useCloset() {
     const images = item.images?.length
       ? item.images.map((image) => {
         if (!image.createdAt) {
-          console.warn('Missing createdAt for clothing image.', image.id);
+          console.warn('Missing createdAt for clothing image; using item timestamp.', image.id);
         }
         return { ...image, createdAt: image.createdAt ?? createdAt };
       })

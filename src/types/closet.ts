@@ -72,7 +72,7 @@ export interface ClothingItem {
   customTags?: string[];
   /** User-written description for this item */
   description?: string;
-  /** Legacy single-image field (kept for backwards compatibility) */
+  /** Legacy single-image field (kept for backwards compatibility; auto-filled from primary image when available) */
   imageData?: string;
   /** Multi-image support */
   images?: ClothingImage[];
