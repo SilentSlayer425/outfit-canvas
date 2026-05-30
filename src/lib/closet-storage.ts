@@ -1,8 +1,16 @@
-import type { ClothingItem, Outfit } from '@/types/closet';
+import type {
+  ClothingItem,
+  Outfit,
+  ScheduleRecord,
+  RandomizerLockState,
+} from '@/types/closet';
+import { DEFAULT_RANDOMIZER_LOCK_STATE } from '@/types/closet';
 
 interface ClosetState {
   items: ClothingItem[];
   outfits: Outfit[];
+  schedules: ScheduleRecord[];
+  randomizer: RandomizerLockState;
 }
 
 // Browser database name — change this to rename the local IndexedDB store
@@ -15,7 +23,39 @@ const STATE_KEY = 'current';
 const LEGACY_ITEMS_KEY = 'closet-items';
 const LEGACY_OUTFITS_KEY = 'closet-outfits';
 
-const EMPTY_STATE: ClosetState = { items: [], outfits: [] };
+const ensureImages = (item: ClothingItem): ClothingItem => {
+  const hasImages = item.images && item.images.length > 0;
+  const images = hasImages
+    ? item.images
+    : item.imageData
+      ? [{
+        id: crypto.randomUUID(),
+        data: item.imageData,
+        createdAt: item.createdAt ?? Date.now(),
+      }]
+      : [];
+  return {
+    ...item,
+    images,
+    primaryImageId: item.primaryImageId ?? images[0]?.id,
+    imageData: item.imageData ?? images[0]?.data,
+  };
+};
+
+const normalizeRandomizerState = (state?: RandomizerLockState): RandomizerLockState => ({
+  ...DEFAULT_RANDOMIZER_LOCK_STATE,
+  ...(state ?? {}),
+  lockedItemIds: state?.lockedItemIds ?? DEFAULT_RANDOMIZER_LOCK_STATE.lockedItemIds,
+});
+
+export const normalizeClosetState = (state?: Partial<ClosetState> | null): ClosetState => ({
+  items: (state?.items ?? []).map(ensureImages),
+  outfits: state?.outfits ?? [],
+  schedules: state?.schedules ?? [],
+  randomizer: normalizeRandomizerState(state?.randomizer),
+});
+
+const EMPTY_STATE: ClosetState = normalizeClosetState({});
 
 const hasIndexedDb = () => typeof window !== 'undefined' && 'indexedDB' in window;
 
@@ -48,10 +88,11 @@ const openDatabase = () =>
     request.onerror = () => reject(request.error ?? new Error('Failed to open local database.'));
   });
 
-export const readLegacyClosetState = (): ClosetState => ({
-  items: loadLegacyValue(LEGACY_ITEMS_KEY, []),
-  outfits: loadLegacyValue(LEGACY_OUTFITS_KEY, []),
-});
+export const readLegacyClosetState = (): ClosetState =>
+  normalizeClosetState({
+    items: loadLegacyValue(LEGACY_ITEMS_KEY, []),
+    outfits: loadLegacyValue(LEGACY_OUTFITS_KEY, []),
+  });
 
 export const clearLegacyClosetState = () => {
   try {
@@ -73,7 +114,7 @@ export const readClosetState = async (): Promise<ClosetState> => {
     const request = store.get(STATE_KEY);
 
     request.onsuccess = () => {
-      resolve((request.result as ClosetState | undefined) ?? EMPTY_STATE);
+      resolve(normalizeClosetState(request.result as ClosetState | undefined));
     };
     request.onerror = () => reject(request.error ?? new Error('Failed to read local closet data.'));
     tx.oncomplete = () => db.close();

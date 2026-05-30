@@ -25,6 +25,43 @@ export type ClothingCategory =
   | 'bags'
   | 'jewelry';
 
+export interface AiTag {
+  label: string;
+  score: number;
+  source?: 'local' | 'cloud';
+}
+
+export interface NsfwAttestation {
+  accepted: boolean;
+  acceptedAt: number;
+  confirmationText?: string;
+}
+
+export interface NsfwMetadata {
+  score: number;
+  blocked: boolean;
+  attestation?: NsfwAttestation;
+}
+
+export interface BackgroundMetadata {
+  removed?: boolean;
+  confidence?: number;
+}
+
+export interface ClothingAiMetadata {
+  tags?: AiTag[];
+  nsfw?: NsfwMetadata;
+  background?: BackgroundMetadata;
+  lastUpdated?: number;
+}
+
+export interface ClothingImage {
+  id: string;
+  data: string;
+  createdAt: number;
+  ai?: ClothingAiMetadata;
+}
+
 export interface ClothingItem {
   id: string;
   name: string;
@@ -35,9 +72,17 @@ export interface ClothingItem {
   customTags?: string[];
   /** User-written description for this item */
   description?: string;
-  imageData: string; // optimized image data URL (metadata stripped during processing)
+  /** Legacy single-image field (kept for backwards compatibility) */
+  imageData?: string; // optimized image data URL (metadata stripped during processing)
+  /** Multi-image support */
+  images?: ClothingImage[];
+  /** Primary image id when multiple images exist */
+  primaryImageId?: string;
+  /** AI metadata for this item */
+  ai?: ClothingAiMetadata;
   color?: string;
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface OutfitItem {
@@ -55,6 +100,51 @@ export interface Outfit {
   items: OutfitItem[];
   createdAt: number;
 }
+
+export interface ScheduleRecord {
+  id: string;
+  outfitId: string;
+  startAt: number;
+  endAt?: number;
+  createdAt: number;
+  calendarEventIds?: {
+    google?: string;
+    apple?: string;
+    icsFileName?: string;
+  };
+  notes?: string;
+}
+
+export interface RandomizerLockState {
+  lockedItemIds: string[];
+  lockedCategories?: Partial<Record<ClothingCategory, boolean>>;
+  lastUpdated?: number;
+}
+
+export const DEFAULT_RANDOMIZER_LOCK_STATE: RandomizerLockState = {
+  lockedItemIds: [],
+};
+
+export interface NewClothingItemInput {
+  name: string;
+  category: ClothingCategory;
+  subcategory?: string;
+  customTags?: string[];
+  description?: string;
+  imageData?: string;
+  images?: ClothingImage[];
+  primaryImageId?: string;
+  color?: string;
+  ai?: ClothingAiMetadata;
+}
+
+export const getItemPrimaryImageData = (item: ClothingItem): string | undefined => {
+  const images = item.images ?? [];
+  const primary = item.primaryImageId
+    ? images.find((img) => img.id === item.primaryImageId)
+    : images[0];
+  return primary?.data ?? item.imageData;
+};
 
 export const CATEGORY_LABELS: Record<ClothingCategory, string> = {
   tops: 'Tops',

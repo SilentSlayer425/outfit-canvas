@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { ClothingItem, ClothingCategory } from '@/types/closet';
-import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
+import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES, getItemPrimaryImageData } from '@/types/closet';
 
 interface EditItemModalProps {
   open: boolean;
@@ -46,6 +46,7 @@ export function EditItemModal({ open, item, onClose, onSave }: EditItemModalProp
   }, [item]);
 
   if (!item) return null;
+  const imageSrc = getItemPrimaryImageData(item);
 
   const addTag = () => {
     const tag = newTag.trim();
@@ -98,7 +99,7 @@ export function EditItemModal({ open, item, onClose, onSave }: EditItemModalProp
             {/* Thumbnail preview */}
             <div className="mb-4 flex justify-center">
               <div className="h-28 w-28 rounded-xl bg-muted/30 p-2">
-                <img src={item.imageData} alt={item.name} className="h-full w-full object-contain" />
+                <img src={imageSrc ?? ''} alt={item.name} className="h-full w-full object-contain" />
               </div>
             </div>
 

@@ -8,11 +8,13 @@
  */
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { DRIVE_FOLDER_NAME, DRIVE_DATA_FILE } from '@/config';
-import type { ClothingItem, Outfit } from '@/types/closet';
+import type { ClothingItem, Outfit, ScheduleRecord, RandomizerLockState } from '@/types/closet';
 
 interface DriveData {
   items: ClothingItem[];
   outfits: Outfit[];
+  schedules?: ScheduleRecord[];
+  randomizer?: RandomizerLockState;
   darkMode?: boolean;
   weatherCity?: string;
   weatherLat?: number; // add

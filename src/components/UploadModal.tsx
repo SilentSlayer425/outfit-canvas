@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { ClothingCategory } from '@/types/closet';
+import type { ClothingCategory, NewClothingItemInput } from '@/types/closet';
 import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
 import {
   isHeicLike,
@@ -26,7 +26,7 @@ import {
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
-  onUpload: (data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; imageData: string }) => void;
+  onUpload: (data: NewClothingItemInput) => void;
 }
 
 export function UploadModal({ open, onClose, onUpload }: UploadModalProps) {

@@ -8,17 +8,28 @@
  *  - Change DB_NAME / STORE_NAME in src/lib/closet-storage.ts to rename local storage buckets
  */
 import { useState, useEffect, useCallback } from 'react';
-import type { ClothingItem, Outfit, ClothingCategory } from '@/types/closet';
+import type {
+  ClothingItem,
+  Outfit,
+  ClothingCategory,
+  ScheduleRecord,
+  RandomizerLockState,
+  NewClothingItemInput,
+} from '@/types/closet';
+import { DEFAULT_RANDOMIZER_LOCK_STATE } from '@/types/closet';
 import {
   clearLegacyClosetState,
   readClosetState,
   readLegacyClosetState,
   writeClosetState,
+  normalizeClosetState,
 } from '@/lib/closet-storage';
 
 export function useCloset() {
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleRecord[]>([]);
+  const [randomizerState, setRandomizerState] = useState<RandomizerLockState>(DEFAULT_RANDOMIZER_LOCK_STATE);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -28,9 +39,11 @@ export function useCloset() {
       try {
         const stored = await readClosetState();
 
-        if (!cancelled && (stored.items.length > 0 || stored.outfits.length > 0)) {
+        if (!cancelled && (stored.items.length > 0 || stored.outfits.length > 0 || stored.schedules.length > 0)) {
           setItems(stored.items);
           setOutfits(stored.outfits);
+          setSchedules(stored.schedules);
+          setRandomizerState(stored.randomizer);
           setReady(true);
           return;
         }
@@ -42,10 +55,12 @@ export function useCloset() {
       if (!cancelled) {
         setItems(legacy.items);
         setOutfits(legacy.outfits);
+        setSchedules(legacy.schedules);
+        setRandomizerState(legacy.randomizer);
         setReady(true);
       }
 
-      if (legacy.items.length > 0 || legacy.outfits.length > 0) {
+      if (legacy.items.length > 0 || legacy.outfits.length > 0 || legacy.schedules.length > 0) {
         writeClosetState(legacy)
           .then(() => clearLegacyClosetState())
           .catch((error) => console.error('Failed to migrate legacy closet state:', error));
@@ -62,13 +77,30 @@ export function useCloset() {
   useEffect(() => {
     if (!ready) return;
 
-    writeClosetState({ items, outfits }).catch((error) => {
+    writeClosetState({ items, outfits, schedules, randomizer: randomizerState }).catch((error) => {
       console.error('Failed to persist closet state:', error);
     });
-  }, [items, outfits, ready]);
+  }, [items, outfits, schedules, randomizerState, ready]);
 
-  const addItem = useCallback((item: Omit<ClothingItem, 'id' | 'createdAt'>) => {
-    const newItem: ClothingItem = { ...item, id: crypto.randomUUID(), createdAt: Date.now() };
+  const addItem = useCallback((item: NewClothingItemInput) => {
+    const createdAt = Date.now();
+    const images = item.images?.length
+      ? item.images.map((image) => ({ ...image, createdAt: image.createdAt ?? createdAt }))
+      : item.imageData
+        ? [{
+          id: crypto.randomUUID(),
+          data: item.imageData,
+          createdAt,
+        }]
+        : [];
+    const newItem: ClothingItem = {
+      ...item,
+      id: crypto.randomUUID(),
+      createdAt,
+      images,
+      primaryImageId: item.primaryImageId ?? images[0]?.id,
+      imageData: item.imageData ?? images[0]?.data,
+    };
     setItems((prev) => [newItem, ...prev]);
     return newItem;
   }, []);
@@ -80,6 +112,10 @@ export function useCloset() {
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setOutfits((prev) => prev.map((o) => ({ ...o, items: o.items.filter((oi) => oi.clothingId !== id) })));
+    setRandomizerState((prev) => ({
+      ...prev,
+      lockedItemIds: prev.lockedItemIds.filter((lockedId) => lockedId !== id),
+    }));
   }, []);
 
   const getItemsByCategory = useCallback((category: ClothingCategory) => {
@@ -98,14 +134,29 @@ export function useCloset() {
 
   const getItemById = useCallback((id: string) => items.find((i) => i.id === id), [items]);
 
-  const replaceAll = useCallback((newItems: ClothingItem[], newOutfits: Outfit[]) => {
-    setItems(newItems);
-    setOutfits(newOutfits);
+  const replaceAll = useCallback((
+    newItems: ClothingItem[],
+    newOutfits: Outfit[],
+    newSchedules: ScheduleRecord[] = [],
+    newRandomizer: RandomizerLockState = DEFAULT_RANDOMIZER_LOCK_STATE,
+  ) => {
+    const normalized = normalizeClosetState({
+      items: newItems,
+      outfits: newOutfits,
+      schedules: newSchedules,
+      randomizer: newRandomizer,
+    });
+    setItems(normalized.items);
+    setOutfits(normalized.outfits);
+    setSchedules(normalized.schedules);
+    setRandomizerState(normalized.randomizer);
   }, []);
 
   return {
     items,
     outfits,
+    schedules,
+    randomizerState,
     ready,
     addItem,
     updateItem,

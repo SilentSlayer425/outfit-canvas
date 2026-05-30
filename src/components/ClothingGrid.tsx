@@ -16,7 +16,7 @@ import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, Pencil } from 'lucide-react';
 import type { ClothingItem, ClothingCategory } from '@/types/closet';
-import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
+import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES, getItemPrimaryImageData } from '@/types/closet';
 import { GRID_COLS, GRID_ITEM_STAGGER } from '@/config';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 
@@ -129,7 +129,9 @@ export function ClothingGrid({
         </div>
       ) : (
         <div className={`grid ${GRID_COLS} gap-3`}>
-          {filtered.map((item, i) => (
+          {filtered.map((item, i) => {
+            const imageSrc = getItemPrimaryImageData(item);
+            return (
             <motion.div
               key={item.id}
               initial={{ opacity: 0, y: 12 }}
@@ -145,7 +147,7 @@ export function ClothingGrid({
             >
               {/* Image container */}
               <div className="aspect-square p-2">
-                <img src={item.imageData} alt={item.name} className="w-full h-full object-contain" />
+                <img src={imageSrc ?? ''} alt={item.name} className="w-full h-full object-contain" />
               </div>
               <div className="px-3 pb-3">
                 <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
@@ -185,7 +187,8 @@ export function ClothingGrid({
                 </div>
               )}
             </motion.div>
-          ))}
+            );
+          })}
         </div>
       )}
 

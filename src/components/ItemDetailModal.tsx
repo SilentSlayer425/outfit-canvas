@@ -16,7 +16,7 @@ import { X, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { ClothingItem } from '@/types/closet';
-import { CATEGORY_LABELS } from '@/types/closet';
+import { CATEGORY_LABELS, getItemPrimaryImageData } from '@/types/closet';
 
 interface ItemDetailModalProps {
   open: boolean;
@@ -30,6 +30,7 @@ export function ItemDetailModal({ open, item, onClose, onEdit, onDelete }: ItemD
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!item) return null;
+  const imageSrc = getItemPrimaryImageData(item);
 
   return (
     <>
@@ -57,7 +58,7 @@ export function ItemDetailModal({ open, item, onClose, onEdit, onDelete }: ItemD
 
               {/* Full image preview — change h-64 for taller/shorter */}
               <div className="mb-4 flex justify-center rounded-xl bg-muted/30 p-4 h-64">
-                <img src={item.imageData} alt={item.name} className="h-full w-auto object-contain" />
+                <img src={imageSrc ?? ''} alt={item.name} className="h-full w-auto object-contain" />
               </div>
 
               <div className="space-y-2">
