@@ -20,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ItemDetailModal } from '@/components/ItemDetailModal';
 import type { Outfit, ClothingItem } from '@/types/closet';
+import { getItemPrimaryImageData } from '@/types/closet';
 
 interface SavedOutfitsProps {
   outfits: Outfit[];
@@ -67,11 +68,12 @@ export function SavedOutfits({ outfits, getItemById, onRemove, onLoad, onEditIte
               {outfit.items.map((oi, idx) => {
                 const item = getItemById(oi.clothingId);
                 if (!item) return null;
+                const imageSrc = getItemPrimaryImageData(item);
                 return (
                   <Tooltip key={idx}>
                     <TooltipTrigger asChild>
                       <img
-                        src={item.imageData}
+                        src={imageSrc ?? ''}
                         alt={item.name}
                         className="h-16 w-16 object-contain cursor-pointer hover:scale-110 transition-transform"
                         onClick={() => setViewItem(item)}

@@ -29,7 +29,7 @@ import { SavedOutfits } from '@/components/SavedOutfits';
 import { DonationPage } from '@/components/DonationPage';
 import { WeatherWidget } from '@/components/WeatherWidget';
 import { CATEGORY_Y_DEFAULTS, CATEGORY_X_DEFAULTS, PAGE_TRANSITION_DURATION } from '@/config';
-import type { ClothingCategory, ClothingItem, OutfitItem, Outfit } from '@/types/closet';
+import type { ClothingCategory, ClothingItem, OutfitItem, Outfit, NewClothingItemInput } from '@/types/closet';
 import type { GoogleUser } from '@/hooks/useGoogleAuth';
 import { goToSubdomain } from '@/utils/navigation';
 
@@ -48,7 +48,20 @@ interface IndexProps {
 }
 
 export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDarkMode }: IndexProps) {
-  const { items, outfits, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll } = useCloset();
+  const {
+    items,
+    outfits,
+    schedules,
+    randomizerState,
+    ready,
+    addItem,
+    updateItem,
+    removeItem,
+    saveOutfit,
+    removeOutfit,
+    getItemById,
+    replaceAll,
+  } = useCloset();
   const { saveToDrive, loadFromDrive, syncing, lastSync } = useGoogleDrive(user.accessToken);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -79,8 +92,8 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     if (!ready) return;
     loadFromDrive().then((data) => {
       if (data) {
-        if (data.items?.length || data.outfits?.length) {
-          replaceAll(data.items || [], data.outfits || []);
+        if (data.items?.length || data.outfits?.length || data.schedules?.length) {
+          replaceAll(data.items || [], data.outfits || [], data.schedules || [], data.randomizer);
         }
         if (data.weatherCity) {
           setWeatherCity(data.weatherCity);
@@ -99,12 +112,21 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
   useEffect(() => {
     if (!ready || !driveLoaded.current) return; // ← add !driveLoaded.current
     const timer = setTimeout(() => {
-      saveToDrive({ items, outfits, weatherCity, weatherLat, weatherLon, darkMode } as any); // ← add weatherLat, weatherLon
+      saveToDrive({
+        items,
+        outfits,
+        schedules,
+        randomizer: randomizerState,
+        weatherCity,
+        weatherLat,
+        weatherLon,
+        darkMode,
+      });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [items, outfits, weatherCity, weatherLat, weatherLon, darkMode, saveToDrive, ready]); // ← add weatherLat, weatherLon
+  }, [items, outfits, schedules, randomizerState, weatherCity, weatherLat, weatherLon, darkMode, saveToDrive, ready]); // ← add weatherLat, weatherLon
 
-  const handleUpload = useCallback((data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; imageData: string }) => {
+  const handleUpload = useCallback((data: NewClothingItemInput) => {
     addItem(data);
   }, [addItem]);
 

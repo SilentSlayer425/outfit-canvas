@@ -32,6 +32,7 @@ import {
   ITEM_BASE_SIZE,
 } from '@/config';
 import type { ClothingItem, OutfitItem } from '@/types/closet';
+import { getItemPrimaryImageData } from '@/types/closet';
 
 /** Minimum zIndex for outfit items — keeps them above the mannequin */
 const MIN_Z = 1;
@@ -174,6 +175,7 @@ export function OutfitCanvas({ outfitItems, getItemById, onUpdateItem, onRemoveI
         {outfitItems.map((oi, idx) => {
           const item = getItemById(oi.clothingId);
           if (!item) return null;
+          const imageSrc = getItemPrimaryImageData(item);
           const isSelected = selectedIdx === idx;
           const size = ITEM_BASE_SIZE * oi.scale;
           // Ensure zIndex is always at least MIN_Z
@@ -196,7 +198,7 @@ export function OutfitCanvas({ outfitItems, getItemById, onUpdateItem, onRemoveI
               onClick={(e) => { e.stopPropagation(); setSelectedIdx(idx); }}
             >
               <img
-                src={item.imageData}
+                src={imageSrc ?? ''}
                 alt={item.name}
                 className="w-full h-auto object-contain pointer-events-none"
                 draggable={false}
