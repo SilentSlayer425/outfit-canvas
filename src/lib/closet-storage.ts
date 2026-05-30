@@ -27,7 +27,7 @@ const ensureImages = (item: ClothingItem): ClothingItem => {
   const hasImages = item.images && item.images.length > 0;
   const createdAt = item.createdAt ?? Date.now();
   if (!item.createdAt) {
-    console.warn('Missing createdAt for clothing item during migration; using current time.', item.id);
+    console.warn('Missing createdAt for clothing item during legacy migration; using current time for ordering.', item.id);
   }
   const images = hasImages
     ? item.images
