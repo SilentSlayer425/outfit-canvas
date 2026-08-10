@@ -19,34 +19,39 @@ export function isItemLinkable(category: ClothingCategory): boolean {
  * Pairing info for an item
  */
 export interface PairingInfo {
-  /** The item this is paired to, if any */
-  pairedToItem?: ClothingItem;
-  /** Items that are paired to this item */
+  /** Items this is paired to (e.g., a necklace paired to multiple shirts) */
+  pairedToItems: ClothingItem[];
+  /** Items that are paired to this item (e.g., a shirt with multiple accessories paired to it) */
   pairedItems: ClothingItem[];
 }
 
 /**
  * Get pairing information for a specific item across all outfits.
  * Returns:
- * - pairedToItem: the item this is paired to (if this item is an accessory paired to something)
- * - pairedItems: all items paired to this item (if other items are paired to this)
+ * - pairedToItems: items this is paired to (e.g., a necklace paired to multiple shirts)
+ * - pairedItems: all items paired to this item (e.g., a shirt with multiple accessories paired to it)
  */
 export function getPairingInfo(itemId: string, outfits: Outfit[], allItems: ClothingItem[]): PairingInfo {
   // Find what this item is paired to
-  let pairedToItem: ClothingItem | undefined;
-  let pairedToClothingId: string | undefined;
+  const pairedToIds = new Set<string>();
 
   // Look through all outfit items to find if this item is paired to something
   for (const outfit of outfits) {
     for (const outfitItem of outfit.items) {
-      if (outfitItem.clothingId === itemId && outfitItem.pairedToClothingId) {
-        pairedToClothingId = outfitItem.pairedToClothingId;
-        pairedToItem = allItems.find((item) => item.id === pairedToClothingId);
-        break;
+      if (outfitItem.clothingId === itemId && outfitItem.pairedToClothingIds) {
+        for (const pairedId of outfitItem.pairedToClothingIds) {
+          pairedToIds.add(pairedId);
+        }
+        break; // Only check first outfit where this item appears
       }
     }
-    if (pairedToItem) break;
+    if (pairedToIds.size > 0) break;
   }
+
+  // Convert paired IDs to items
+  const pairedToItems = Array.from(pairedToIds)
+    .map((id) => allItems.find((item) => item.id === id))
+    .filter((item): item is ClothingItem => item !== undefined);
 
   // Find all items that are paired to this item
   const pairedItems: ClothingItem[] = [];
@@ -54,7 +59,7 @@ export function getPairingInfo(itemId: string, outfits: Outfit[], allItems: Clot
 
   for (const outfit of outfits) {
     for (const outfitItem of outfit.items) {
-      if (outfitItem.pairedToClothingId === itemId && !seenIds.has(outfitItem.clothingId)) {
+      if (outfitItem.pairedToClothingIds?.includes(itemId) && !seenIds.has(outfitItem.clothingId)) {
         seenIds.add(outfitItem.clothingId);
         const item = allItems.find((i) => i.id === outfitItem.clothingId);
         if (item) {
@@ -65,7 +70,7 @@ export function getPairingInfo(itemId: string, outfits: Outfit[], allItems: Clot
   }
 
   return {
-    pairedToItem,
+    pairedToItems,
     pairedItems,
   };
 }
@@ -78,11 +83,11 @@ export function isItemPaired(itemId: string, outfits: Outfit[]): boolean {
   for (const outfit of outfits) {
     for (const outfitItem of outfit.items) {
       // Check if this item is paired to something
-      if (outfitItem.clothingId === itemId && outfitItem.pairedToClothingId) {
+      if (outfitItem.clothingId === itemId && outfitItem.pairedToClothingIds?.length) {
         return true;
       }
       // Check if something is paired to this item
-      if (outfitItem.pairedToClothingId === itemId) {
+      if (outfitItem.pairedToClothingIds?.includes(itemId)) {
         return true;
       }
     }

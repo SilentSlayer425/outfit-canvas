@@ -75,8 +75,8 @@ export interface OutfitItem {
   zIndex: number;
   /** Which side of the person the item is on. Feature: Canvas: Back of Person (Phase 1) */
   side?: 'front' | 'back'; // defaults to 'front' for backward compatibility
-  /** ID of another item this is paired with for coordinated outfit building. Feature: Accessory Pairing */
-  pairedToClothingId?: string;
+  /** IDs of other items this is paired with for coordinated outfit building. Feature: Accessory Pairing */
+  pairedToClothingIds?: string[]; // array allows accessories to be linked to multiple main items
 }
 
 export interface Outfit {

@@ -121,8 +121,24 @@ export function useCloset() {
   }, []);
 
   const deleteCustomTag = useCallback((id: string) => {
+    // Find the custom tag being deleted to get its label
+    const tagToDelete = customMainTags.find((tag) => tag.id === id);
+    if (!tagToDelete) return;
+
+    // Reassign any items using this custom category to 'accessories' (default fallback)
+    setItems((prev) =>
+      prev.map((item) => {
+        // If item's category matches the deleted custom tag's label, reassign to accessories
+        if (item.category === tagToDelete.label) {
+          return { ...item, category: 'accessories' as ClothingCategory };
+        }
+        return item;
+      })
+    );
+
+    // Remove the tag from customMainTags
     setCustomMainTags((prev) => prev.filter((tag) => tag.id !== id));
-  }, []);
+  }, [customMainTags]);
 
   const duplicateItem = useCallback((itemId: string, customizations?: { name?: string; description?: string }) => {
     const original = items.find((i) => i.id === itemId);
@@ -142,6 +158,44 @@ export function useCloset() {
     return newItem.id;
   }, [items]);
 
+  const createOutfitWithPairing = useCallback((accessoryId: string, mainItemId: string) => {
+    const accessoryItem = items.find((i) => i.id === accessoryId);
+    const mainItem = items.find((i) => i.id === mainItemId);
+
+    if (!accessoryItem || !mainItem) return null;
+
+    // Create outfit with both items
+    const newOutfit: Outfit = {
+      id: crypto.randomUUID(),
+      name: `${mainItem.name} + ${accessoryItem.name}`,
+      items: [
+        {
+          clothingId: mainItemId,
+          category: mainItem.category,
+          x: 0,
+          y: 0,
+          scale: 1,
+          zIndex: 1,
+          side: 'front',
+        },
+        {
+          clothingId: accessoryId,
+          category: accessoryItem.category,
+          x: 100,
+          y: -50,
+          scale: 1,
+          zIndex: 2,
+          side: 'front',
+          pairedToClothingIds: [mainItemId],
+        },
+      ],
+      createdAt: Date.now(),
+    };
+
+    setOutfits((prev) => [newOutfit, ...prev]);
+    return newOutfit;
+  }, [items]);
+
   return {
     items,
     outfits,
@@ -158,5 +212,6 @@ export function useCloset() {
     duplicateItem,
     addCustomTag,
     deleteCustomTag,
+    createOutfitWithPairing,
   };
 }

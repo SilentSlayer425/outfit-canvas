@@ -36,6 +36,7 @@ import type { ClothingCategory, ClothingItem, OutfitItem, Outfit } from '@/types
 import type { GoogleUser } from '@/hooks/useGoogleAuth';
 import { goToSubdomain } from '@/utils/navigation';
 import { getCategoryDefaults } from '@/lib/category-helpers';
+import { getPairingInfo } from '@/lib/pairing-helpers';
 
 const pageVariants = {
   initial: { opacity: 0, x: 20 },
@@ -52,7 +53,7 @@ interface IndexProps {
 }
 
 export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDarkMode }: IndexProps) {
-  const { items, outfits, customMainTags, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll, duplicateItem, addCustomTag } = useCloset();
+  const { items, outfits, customMainTags, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll, duplicateItem, addCustomTag, deleteCustomTag, createOutfitWithPairing } = useCloset();
   const { saveToDrive, loadFromDrive, syncing, lastSync } = useGoogleDrive(user.accessToken);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -129,19 +130,69 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
       CATEGORY_X_DEFAULTS[item.category] ?? 0,
       CATEGORY_Y_DEFAULTS[item.category] ?? 0
     );
-    setOutfitItems((prev) => [
-      ...prev,
-      {
-        clothingId: item.id,
-        category: item.category,
-        x: defaults.x,
-        y: defaults.y,
-        scale: 1,
-        zIndex: prev.length + 1,
-        side: addToSide,
-      },
-    ]);
-  }, [addToSide, customMainTags]);
+
+    // Create outfit item for the main item
+    const outfitItem: OutfitItem = {
+      clothingId: item.id,
+      category: item.category,
+      x: defaults.x,
+      y: defaults.y,
+      scale: 1,
+      zIndex: outfitItems.length + 1,
+      side: addToSide,
+    };
+
+    const itemsToAdd: OutfitItem[] = [outfitItem];
+    const itemNames: string[] = [item.name];
+
+    // Find linked items: items this is paired to AND items paired to this
+    const pairingInfo = getPairingInfo(item.id, outfits, items);
+    const linkedItems = [
+      ...pairingInfo.pairedToItems,
+      ...pairingInfo.pairedItems,
+    ];
+
+    // Get existing clothing IDs in the outfit to avoid duplicates
+    const existingClothingIds = new Set(outfitItems.map((oi) => oi.clothingId));
+
+    // Add linked items that aren't already in the outfit
+    linkedItems.forEach((linkedItem) => {
+      if (!existingClothingIds.has(linkedItem.id)) {
+        const linkedDefaults = getCategoryDefaults(
+          linkedItem.category,
+          customMainTags,
+          CATEGORY_X_DEFAULTS[linkedItem.category] ?? 0,
+          CATEGORY_Y_DEFAULTS[linkedItem.category] ?? 0
+        );
+
+        // Offset linked items by 50px to avoid stacking directly on top
+        const linkedOutfitItem: OutfitItem = {
+          clothingId: linkedItem.id,
+          category: linkedItem.category,
+          x: linkedDefaults.x + 50,
+          y: linkedDefaults.y,
+          scale: 1,
+          zIndex: itemsToAdd.length + outfitItems.length,
+          side: addToSide,
+          pairedToClothingIds: [item.id],
+        };
+
+        itemsToAdd.push(linkedOutfitItem);
+        itemNames.push(linkedItem.name);
+      }
+    });
+
+    // Add all items to outfit
+    setOutfitItems((prev) => [...prev, ...itemsToAdd]);
+
+    // Show toast notification
+    if (itemsToAdd.length > 1) {
+      const linkedCount = itemsToAdd.length - 1;
+      toast.success(
+        `Added ${item.name} and ${linkedCount} linked item${linkedCount !== 1 ? 's' : ''}`
+      );
+    }
+  }, [addToSide, customMainTags, items, outfits, outfitItems]);
 
   const updateOutfitItem = useCallback((index: number, updates: Partial<OutfitItem>) => {
     setOutfitItems((prev) => prev.map((oi, i) => (i === index ? { ...oi, ...updates } : oi)));
@@ -209,6 +260,14 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     addCustomTag(label, { defaultX: 0, defaultY: -80 });
     toast.success(`Category '${label}' created`);
   }, [addCustomTag]);
+
+  const handleDeleteCategory = useCallback((id: string) => {
+    const category = customMainTags.find((tag) => tag.id === id);
+    if (category) {
+      deleteCustomTag(id);
+      toast.success(`Category '${category.label}' deleted`);
+    }
+  }, [deleteCustomTag, customMainTags]);
 
   const headerTitle: Record<Tab, string> = {
     home: 'Home',
@@ -482,7 +541,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
       </main>
 
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} customMainTags={customMainTags} onUpload={handleUpload} />
-      <AddCategoryModal open={addCategoryOpen} onClose={() => setAddCategoryOpen(false)} onCreate={handleCreateCategory} />
+      <AddCategoryModal open={addCategoryOpen} onClose={() => setAddCategoryOpen(false)} onCreate={handleCreateCategory} customCategories={customMainTags} onDeleteCategory={handleDeleteCategory} />
       <EditItemModal open={!!editItem} item={editItem} onClose={() => setEditItem(null)} customMainTags={customMainTags} onSave={updateItem} />
       <ItemDetailModal
         open={!!viewItem}
@@ -493,6 +552,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
         outfits={outfits}
         allItems={items}
         onViewPairedItem={setViewItem}
+        onCreatePairing={createOutfitWithPairing}
       />
       <ConfirmDialog
         open={confirmDeleteAll}

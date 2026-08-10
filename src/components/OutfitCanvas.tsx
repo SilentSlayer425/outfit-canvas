@@ -20,9 +20,16 @@
  */
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Trash2, Plus, ZoomIn, ZoomOut, ArrowUp, ArrowDown } from 'lucide-react';
+import { Save, Trash2, Plus, ZoomIn, ZoomOut, ArrowUp, ArrowDown, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import {
   CANVAS_MIN_HEIGHT,
   ARROW_KEY_STEP,
@@ -48,6 +55,8 @@ export function OutfitCanvas({ outfitItems, getItemById, onUpdateItem, onRemoveI
   const [outfitName, setOutfitName] = useState('');
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [dragging, setDragging] = useState<{ idx: number; startX: number; startY: number; itemX: number; itemY: number } | null>(null);
+  const [pairingModalOpen, setPairingModalOpen] = useState(false);
+  const [pairingSelectedIdx, setPairingSelectedIdx] = useState<number | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
   // ── Mouse / touch drag (no snapping, stays under cursor) ──
@@ -140,6 +149,28 @@ export function OutfitCanvas({ outfitItems, getItemById, onUpdateItem, onRemoveI
     onUpdateItem(index, { zIndex: Math.max(MIN_Z, newZ) });
   };
 
+  // Check if an item can be paired (is an accessory, jewelry, or bag)
+  const isPairableCategory = (category: string): boolean => {
+    return ['accessories', 'jewelry', 'bags'].includes(category);
+  };
+
+  // Handle pairing: link the selected accessory to another item
+  const handlePairing = (itemToPairWithIdx: number) => {
+    if (pairingSelectedIdx === null) return;
+    const itemToPairWith = outfitItems[itemToPairWithIdx];
+    if (itemToPairWith) {
+      onUpdateItem(pairingSelectedIdx, { pairedToClothingIds: [itemToPairWith.clothingId] });
+    }
+    setPairingModalOpen(false);
+    setPairingSelectedIdx(null);
+  };
+
+  // Open pairing modal for the selected item
+  const openPairingModal = (index: number) => {
+    setPairingSelectedIdx(index);
+    setPairingModalOpen(true);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Canvas area — change bg-card for background, rounded-2xl for corners */}
@@ -224,6 +255,13 @@ export function OutfitCanvas({ outfitItems, getItemById, onUpdateItem, onRemoveI
                     className="p-1 rounded-full hover:bg-muted" title="Zoom in">
                     <ZoomIn className="w-4 h-4" />
                   </button>
+                  {/* Pairing button — only for accessories, jewelry, and bags */}
+                  {isPairableCategory(oi.category) && (
+                    <button onClick={(e) => { e.stopPropagation(); openPairingModal(idx); }}
+                      className="p-1 rounded-full hover:bg-muted" title="Link to item">
+                      <Link2 className="w-4 h-4" />
+                    </button>
+                  )}
                   {/* Delete button — change hover:bg-destructive for different delete color */}
                   <button onClick={(e) => { e.stopPropagation(); onRemoveItem(idx); setSelectedIdx(null); }}
                     className="p-1 rounded-full hover:bg-destructive hover:text-destructive-foreground" title="Remove">
@@ -258,6 +296,50 @@ export function OutfitCanvas({ outfitItems, getItemById, onUpdateItem, onRemoveI
           </Button>
         </motion.div>
       )}
+
+      {/* Pairing selection modal */}
+      <Dialog open={pairingModalOpen} onOpenChange={setPairingModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link to Item</DialogTitle>
+            <DialogDescription>
+              Select an item to pair this accessory with
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 max-h-96 overflow-y-auto">
+            {outfitItems.map((oi, idx) => {
+              // Skip the item being paired and other pairable items
+              if (idx === pairingSelectedIdx || isPairableCategory(oi.category)) {
+                return null;
+              }
+              const item = getItemById(oi.clothingId);
+              if (!item) return null;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handlePairing(idx)}
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors text-left"
+                >
+                  <img
+                    src={item.imageData}
+                    alt={item.name}
+                    className="w-12 h-12 object-cover rounded"
+                  />
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.category}</p>
+                  </div>
+                </button>
+              );
+            })}
+            {outfitItems.filter((_, idx) => idx !== pairingSelectedIdx && !isPairableCategory(outfitItems[idx].category)).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No items available to pair with
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

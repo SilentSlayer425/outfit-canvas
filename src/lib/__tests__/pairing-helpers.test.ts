@@ -89,11 +89,11 @@ describe('pairing-helpers', () => {
       ];
 
       const info = getPairingInfo('shirt-1', outfits, mockItems);
-      expect(info.pairedToItem).toBeUndefined();
+      expect(info.pairedToItems).toEqual([]);
       expect(info.pairedItems).toEqual([]);
     });
 
-    it('should find the item this item is paired to', () => {
+    it('should find the items this item is paired to', () => {
       const outfits: Outfit[] = [
         {
           id: 'outfit-1',
@@ -114,7 +114,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
@@ -122,7 +122,8 @@ describe('pairing-helpers', () => {
       ];
 
       const info = getPairingInfo('necklace-1', outfits, mockItems);
-      expect(info.pairedToItem?.id).toBe('shirt-1');
+      expect(info.pairedToItems).toHaveLength(1);
+      expect(info.pairedToItems[0].id).toBe('shirt-1');
       expect(info.pairedItems).toEqual([]);
     });
 
@@ -147,7 +148,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
             {
               clothingId: 'watch-1',
@@ -156,7 +157,7 @@ describe('pairing-helpers', () => {
               y: 100,
               scale: 1,
               zIndex: 3,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
@@ -164,7 +165,7 @@ describe('pairing-helpers', () => {
       ];
 
       const info = getPairingInfo('shirt-1', outfits, mockItems);
-      expect(info.pairedToItem).toBeUndefined();
+      expect(info.pairedToItems).toEqual([]);
       expect(info.pairedItems).toHaveLength(2);
       expect(info.pairedItems.map((i) => i.id).sort()).toEqual(['necklace-1', 'watch-1'].sort());
     });
@@ -190,7 +191,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
             {
               clothingId: 'watch-1',
@@ -199,7 +200,7 @@ describe('pairing-helpers', () => {
               y: 100,
               scale: 1,
               zIndex: 3,
-              pairedToClothingId: 'necklace-1',
+              pairedToClothingIds: ['necklace-1'],
             },
           ],
           createdAt: Date.now(),
@@ -208,7 +209,8 @@ describe('pairing-helpers', () => {
 
       // Check necklace (paired to shirt AND has watch paired to it)
       const necklaceInfo = getPairingInfo('necklace-1', outfits, mockItems);
-      expect(necklaceInfo.pairedToItem?.id).toBe('shirt-1');
+      expect(necklaceInfo.pairedToItems).toHaveLength(1);
+      expect(necklaceInfo.pairedToItems[0].id).toBe('shirt-1');
       expect(necklaceInfo.pairedItems).toHaveLength(1);
       expect(necklaceInfo.pairedItems[0].id).toBe('watch-1');
     });
@@ -226,7 +228,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
@@ -242,7 +244,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'jeans-1',
+              pairedToClothingIds: ['jeans-1'],
             },
           ],
           createdAt: Date.now(),
@@ -251,7 +253,8 @@ describe('pairing-helpers', () => {
 
       // Should find the first pairing
       const info = getPairingInfo('necklace-1', outfits, mockItems);
-      expect(info.pairedToItem?.id).toBe('shirt-1');
+      expect(info.pairedToItems).toHaveLength(1);
+      expect(info.pairedToItems[0].id).toBe('shirt-1');
     });
 
     it('should deduplicate paired items across outfits', () => {
@@ -275,7 +278,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
@@ -299,7 +302,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
@@ -309,6 +312,49 @@ describe('pairing-helpers', () => {
       const info = getPairingInfo('shirt-1', outfits, mockItems);
       expect(info.pairedItems).toHaveLength(1);
       expect(info.pairedItems[0].id).toBe('necklace-1');
+    });
+
+    it('should support accessory paired to multiple items', () => {
+      const outfits: Outfit[] = [
+        {
+          id: 'outfit-1',
+          name: 'Casual',
+          items: [
+            {
+              clothingId: 'shirt-1',
+              category: 'tops',
+              x: 0,
+              y: 0,
+              scale: 1,
+              zIndex: 1,
+            },
+            {
+              clothingId: 'jeans-1',
+              category: 'bottoms',
+              x: 0,
+              y: 100,
+              scale: 1,
+              zIndex: 2,
+            },
+            {
+              clothingId: 'watch-1',
+              category: 'accessories',
+              x: 50,
+              y: 100,
+              scale: 1,
+              zIndex: 3,
+              pairedToClothingIds: ['shirt-1', 'jeans-1'], // watch paired to both shirt and jeans
+            },
+          ],
+          createdAt: Date.now(),
+        },
+      ];
+
+      const watchInfo = getPairingInfo('watch-1', outfits, mockItems);
+      expect(watchInfo.pairedToItems).toHaveLength(2);
+      expect(watchInfo.pairedToItems.map((i) => i.id).sort()).toEqual(['jeans-1', 'shirt-1'].sort());
+
+      expect(isItemPaired('watch-1', outfits)).toBe(true);
     });
   });
 
@@ -373,7 +419,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
@@ -404,7 +450,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
@@ -435,7 +481,7 @@ describe('pairing-helpers', () => {
               y: 50,
               scale: 1,
               zIndex: 2,
-              pairedToClothingId: 'shirt-1',
+              pairedToClothingIds: ['shirt-1'],
             },
           ],
           createdAt: Date.now(),
