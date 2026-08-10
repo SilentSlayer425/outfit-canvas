@@ -39,7 +39,7 @@ async function findOrCreateFolder(token: string): Promise<string> {
   // Search for existing folder
   const query = `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   const result = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive`,
     token
   );
 
@@ -60,7 +60,16 @@ async function findOrCreateFolder(token: string): Promise<string> {
 async function findDataFile(token: string, folderId: string): Promise<string | null> {
   const query = `name='${DRIVE_DATA_FILE}' and '${folderId}' in parents and trashed=false`;
   const result = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive`,
+    token
+  );
+  return result.files?.[0]?.id ?? null;
+}
+
+async function findLatestDataFile(token: string): Promise<string | null> {
+  const query = `name='${DRIVE_DATA_FILE}' and trashed=false`;
+  const result = await driveRequest(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive`,
     token
   );
   return result.files?.[0]?.id ?? null;
@@ -77,7 +86,7 @@ export function useGoogleDrive(accessToken: string | undefined) {
     setSyncing(true);
     try {
       const folderId = await findOrCreateFolder(accessToken);
-      const fileId = await findDataFile(accessToken, folderId);
+      const fileId = (await findLatestDataFile(accessToken)) ?? (await findDataFile(accessToken, folderId));
       const jsonBody = JSON.stringify(data);
 
       const metadata = { name: DRIVE_DATA_FILE, parents: fileId ? undefined : [folderId] };
@@ -117,7 +126,7 @@ export function useGoogleDrive(accessToken: string | undefined) {
     setSyncing(true);
     try {
       const folderId = await findOrCreateFolder(accessToken);
-      const fileId = await findDataFile(accessToken, folderId);
+      const fileId = (await findLatestDataFile(accessToken)) ?? (await findDataFile(accessToken, folderId));
       if (!fileId) { setSyncing(false); return null; }
 
       const data = await driveRequest(

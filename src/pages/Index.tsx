@@ -79,9 +79,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     if (!ready) return;
     loadFromDrive().then((data) => {
       if (data) {
-        if (data.items?.length || data.outfits?.length) {
-          replaceAll(data.items || [], data.outfits || []);
-        }
+        replaceAll(data.items || [], data.outfits || []);
         if (data.weatherCity) {
           setWeatherCity(data.weatherCity);
           setWeatherLat(data.weatherLat ?? null); // add
