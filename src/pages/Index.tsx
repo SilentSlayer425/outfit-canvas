@@ -12,6 +12,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Cloud, CloudOff, LogOut, Trash2, RefreshCw, Moon, Sun, FileText, Shield } from 'lucide-react';
+import { toast } from 'sonner';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -79,9 +80,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     if (!ready) return;
     loadFromDrive().then((data) => {
       if (data) {
-        if (data.items?.length || data.outfits?.length) {
-          replaceAll(data.items || [], data.outfits || []);
-        }
+        replaceAll(data.items || [], data.outfits || []);
         if (data.weatherCity) {
           setWeatherCity(data.weatherCity);
           setWeatherLat(data.weatherLat ?? null); // add
@@ -154,6 +153,25 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
   const handleSwitchAccount = useCallback(() => {
     onSignOut();
   }, [onSignOut]);
+
+  const handleHardResync = useCallback(async () => {
+    const data = await loadFromDrive({ forceRefresh: true });
+    if (!data) {
+      toast.error('No Google Drive closet data found.');
+      return;
+    }
+
+    replaceAll(data.items || [], data.outfits || []);
+    if (data.weatherCity) {
+      setWeatherCity(data.weatherCity);
+      setWeatherLat(data.weatherLat ?? null);
+      setWeatherLon(data.weatherLon ?? null);
+    }
+    if (data.darkMode !== undefined) {
+      setDarkMode(data.darkMode);
+    }
+    toast.success('Hard resync complete.');
+  }, [loadFromDrive, replaceAll, setDarkMode, setWeatherCity, setWeatherLat, setWeatherLon]);
 
   const headerTitle: Record<Tab, string> = {
     home: 'Home',
@@ -230,6 +248,13 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                         <Shield className="w-4 h-4" /> Privacy Policy
                       </button>
                     </Link>
+                    <button
+                      onClick={async () => { setProfileMenuOpen(false); await handleHardResync(); }}
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors border-t border-border"
+                      disabled={syncing}
+                    >
+                      <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> Hard Resync
+                    </button>
                     <button
                       onClick={() => { setProfileMenuOpen(false); handleSwitchAccount(); }}
                       className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-muted transition-colors border-t border-border"

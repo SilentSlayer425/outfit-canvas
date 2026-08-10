@@ -19,24 +19,34 @@ interface DriveData {
   weatherLon?: number; // add
 }
 
+interface DriveQueryOptions {
+  forceRefresh?: boolean;
+}
+
 async function driveRequest(url: string, token: string, options: RequestInit = {}) {
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: 'Bearer ' + token,
       ...options.headers,
     },
   });
   if (!res.ok) throw new Error(`Drive API error: ${res.status}`);
-  return res.json();
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return res.json();
+  }
+  return null;
 }
 
-async function findOrCreateFolder(token: string): Promise<string> {
+async function findOrCreateFolder(token: string, options: DriveQueryOptions = {}): Promise<string> {
   // Search for existing folder
   const query = `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
   const result = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
-    token
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive${forceParam}`,
+    token,
+    options.forceRefresh ? { cache: 'no-store' } : {}
   );
 
   if (result.files?.length > 0) return result.files[0].id;
@@ -53,11 +63,24 @@ async function findOrCreateFolder(token: string): Promise<string> {
   return folder.id;
 }
 
-async function findDataFile(token: string, folderId: string): Promise<string | null> {
+async function findDataFile(token: string, folderId: string, options: DriveQueryOptions = {}): Promise<string | null> {
   const query = `name='${DRIVE_DATA_FILE}' and '${folderId}' in parents and trashed=false`;
+  const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
   const result = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`,
-    token
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive${forceParam}`,
+    token,
+    options.forceRefresh ? { cache: 'no-store' } : {}
+  );
+  return result.files?.[0]?.id ?? null;
+}
+
+async function findLatestDataFile(token: string, options: DriveQueryOptions = {}): Promise<string | null> {
+  const query = `name='${DRIVE_DATA_FILE}' and trashed=false`;
+  const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
+  const result = await driveRequest(
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive${forceParam}`,
+    token,
+    options.forceRefresh ? { cache: 'no-store' } : {}
   );
   return result.files?.[0]?.id ?? null;
 }
@@ -73,7 +96,7 @@ export function useGoogleDrive(accessToken: string | undefined) {
     setSyncing(true);
     try {
       const folderId = await findOrCreateFolder(accessToken);
-      const fileId = await findDataFile(accessToken, folderId);
+      const fileId = (await findLatestDataFile(accessToken)) ?? (await findDataFile(accessToken, folderId));
       const jsonBody = JSON.stringify(data);
 
       const metadata = { name: DRIVE_DATA_FILE, parents: fileId ? undefined : [folderId] };
@@ -94,10 +117,9 @@ export function useGoogleDrive(accessToken: string | undefined) {
         ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
         : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 
-      await fetch(url, {
+      await driveRequest(url, accessToken, {
         method: fileId ? 'PATCH' : 'POST',
         headers: {
-          Authorization: `Bearer ${accessToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
         },
         body,
@@ -109,20 +131,20 @@ export function useGoogleDrive(accessToken: string | undefined) {
     setSyncing(false);
   }, [accessToken]);
 
-  const loadFromDrive = useCallback(async (): Promise<DriveData | null> => {
+  const loadFromDrive = useCallback(async (options: DriveQueryOptions = {}): Promise<DriveData | null> => {
     if (!accessToken) return null;
     setSyncing(true);
     try {
-      const folderId = await findOrCreateFolder(accessToken);
-      const fileId = await findDataFile(accessToken, folderId);
+      const folderId = await findOrCreateFolder(accessToken, options);
+      const fileId = (await findLatestDataFile(accessToken, options)) ?? (await findDataFile(accessToken, folderId, options));
       if (!fileId) { setSyncing(false); return null; }
 
-      const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+      const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
+      const data = await driveRequest(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media${forceParam}`,
+        accessToken,
+        options.forceRefresh ? { cache: 'no-store' } : {}
       );
-      if (!res.ok) { setSyncing(false); return null; }
-      const data = await res.json();
       setLastSync(Date.now());
       setSyncing(false);
       return data;
