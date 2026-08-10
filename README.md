@@ -92,6 +92,18 @@ Subdomains map to:
 - Google Drive API
 - IndexedDB
 
+## Build metadata for Terms of Service date
+
+The Terms of Service page reads a build-time constant (`__TOS_LAST_UPDATED__`) generated from this file's latest commit:
+
+- `git log -1 --format=%cI -- src/pages/TermsOfService.tsx`
+
+To make this reliable in CI/CD:
+
+- Ensure Git history is available in build jobs (`actions/checkout` with `fetch-depth: 0`).
+- Ensure `git` is installed in the build environment.
+- If your deploy pipeline strips `.git` metadata (for example during some Docker builds), provide `TOS_LAST_UPDATED` as a build environment variable so the app can use that value instead of running `git log`.
+
 ## Project structure
 
 - `src/pages` — top-level screens

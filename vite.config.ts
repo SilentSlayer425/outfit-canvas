@@ -1,7 +1,28 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { execSync } from "node:child_process";
 import { componentTagger } from "lovable-tagger";
+
+const TOS_FILE_PATH = "src/pages/TermsOfService.tsx";
+
+const getTermsOfServiceLastUpdated = () => {
+  if (process.env.TOS_LAST_UPDATED) {
+    return process.env.TOS_LAST_UPDATED;
+  }
+
+  try {
+    const output = execSync(`git log -1 --format=%cI -- ${TOS_FILE_PATH}`, {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+
+    return output || new Date().toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+};
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -29,6 +50,9 @@ export default defineConfig(({ mode }) => ({
         manualChunks: undefined,
       },
     },
+  },
+  define: {
+    __TOS_LAST_UPDATED__: JSON.stringify(getTermsOfServiceLastUpdated()),
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

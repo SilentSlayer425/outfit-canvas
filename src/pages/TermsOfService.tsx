@@ -10,6 +10,13 @@ import { Button } from '@/components/ui/button';
 
 export default function TermsOfService() {
   const navigate = useNavigate();
+  const parsedLastUpdated = new Date(__TOS_LAST_UPDATED__);
+  const lastUpdatedDate = Number.isNaN(parsedLastUpdated.getTime()) ? new Date() : parsedLastUpdated;
+  const formattedLastUpdated = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(lastUpdatedDate);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -33,7 +40,7 @@ const handleBack = () => {
         </Button>
 
         <h1 className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold text-foreground mb-2">Terms of Service</h1>
-        <p className="text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">Last updated: {new Date().toLocaleDateString()}</p>
+        <p className="text-xs sm:text-sm text-muted-foreground mb-6 sm:mb-8">Last updated: {formattedLastUpdated}</p>
 
         <div className="space-y-4 sm:space-y-6 text-foreground">
           <section>
