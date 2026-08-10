@@ -42,9 +42,8 @@ async function driveRequest(url: string, token: string, options: RequestInit = {
 async function findOrCreateFolder(token: string, options: DriveQueryOptions = {}): Promise<string> {
   // Search for existing folder
   const query = `name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
   const result = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive${forceParam}`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive`,
     token,
     options.forceRefresh ? { cache: 'no-store' } : {}
   );
@@ -65,9 +64,8 @@ async function findOrCreateFolder(token: string, options: DriveQueryOptions = {}
 
 async function findDataFile(token: string, folderId: string, options: DriveQueryOptions = {}): Promise<string | null> {
   const query = `name='${DRIVE_DATA_FILE}' and '${folderId}' in parents and trashed=false`;
-  const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
   const result = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive${forceParam}`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive`,
     token,
     options.forceRefresh ? { cache: 'no-store' } : {}
   );
@@ -76,9 +74,8 @@ async function findDataFile(token: string, folderId: string, options: DriveQuery
 
 async function findLatestDataFile(token: string, options: DriveQueryOptions = {}): Promise<string | null> {
   const query = `name='${DRIVE_DATA_FILE}' and trashed=false`;
-  const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
   const result = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive${forceParam}`,
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&orderBy=modifiedTime desc&spaces=drive`,
     token,
     options.forceRefresh ? { cache: 'no-store' } : {}
   );
@@ -139,9 +136,8 @@ export function useGoogleDrive(accessToken: string | undefined) {
       const fileId = (await findLatestDataFile(accessToken, options)) ?? (await findDataFile(accessToken, folderId, options));
       if (!fileId) { setSyncing(false); return null; }
 
-      const forceParam = options.forceRefresh ? `&_${Date.now()}` : '';
       const data = await driveRequest(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media${forceParam}`,
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
         accessToken,
         options.forceRefresh ? { cache: 'no-store' } : {}
       );
