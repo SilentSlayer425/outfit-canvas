@@ -23,7 +23,7 @@ async function driveRequest(url: string, token: string, options: RequestInit = {
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `******
+      Authorization: 'Bearer ' + token,
       ...options.headers,
     },
   });
