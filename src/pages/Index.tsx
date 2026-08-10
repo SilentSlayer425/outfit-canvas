@@ -297,6 +297,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       onRemove={removeItem}
                       onSelect={addToOutfit}
                       selectable
+                      showItemHoverText
                     />
                   </div>
                 </div>
@@ -311,6 +312,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       onRemove={removeItem}
                       onSelect={addToOutfit}
                       selectable
+                      showItemHoverText
                     />
                   </div>
                   <div className="w-1/3 rounded-2xl border border-border p-4 sticky top-24 self-start">

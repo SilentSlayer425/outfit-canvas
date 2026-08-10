@@ -12,13 +12,14 @@
  *  - Image aspect ratio: change aspect-square to aspect-[3/4] for taller cards
  *  - Category pill colors: change bg-primary / bg-secondary in CategoryPill
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, Pencil } from 'lucide-react';
 import type { ClothingItem, ClothingCategory } from '@/types/closet';
 import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
 import { GRID_COLS, GRID_ITEM_STAGGER } from '@/config';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ClothingGridProps {
   items: ClothingItem[];
@@ -29,10 +30,11 @@ interface ClothingGridProps {
   onEdit?: (item: ClothingItem) => void;
   onView?: (item: ClothingItem) => void;
   selectable?: boolean;
+  showItemHoverText?: boolean;
 }
 
 export function ClothingGrid({
-  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, selectable,
+  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, selectable, showItemHoverText,
 }: ClothingGridProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -130,8 +132,8 @@ export function ClothingGrid({
       ) : (
         <div className={`grid ${GRID_COLS} gap-3`}>
           {filtered.map((item, i) => (
+            <ItemHoverTooltip key={item.id} item={item} enabled={!!showItemHoverText && !!selectable}>
             <motion.div
-              key={item.id}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * GRID_ITEM_STAGGER }}
@@ -185,6 +187,7 @@ export function ClothingGrid({
                 </div>
               )}
             </motion.div>
+            </ItemHoverTooltip>
           ))}
         </div>
       )}
@@ -197,6 +200,33 @@ export function ClothingGrid({
         onCancel={() => setDeleteTarget(null)}
       />
     </div>
+  );
+}
+
+function ItemHoverTooltip({ item, enabled, children }: {
+  item: ClothingItem;
+  enabled: boolean;
+  children: ReactNode;
+}) {
+  if (!enabled) return <>{children}</>;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="top" align="center" className="max-w-64 space-y-1">
+        <p className="text-xs font-semibold">{item.name}</p>
+        <p className="text-[11px] text-muted-foreground">
+          {CATEGORY_LABELS[item.category]}
+          {item.subcategory && <span> Â· {item.subcategory}</span>}
+        </p>
+        {item.description && (
+          <p className="line-clamp-3 text-[11px]">{item.description}</p>
+        )}
+        {item.customTags && item.customTags.length > 0 && (
+          <p className="text-[11px] text-muted-foreground">{item.customTags.join(', ')}</p>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
