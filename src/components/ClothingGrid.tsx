@@ -217,7 +217,7 @@ function ItemHoverTooltip({ item, enabled, children }: {
         <p className="text-xs font-semibold">{item.name}</p>
         <p className="text-[11px] text-muted-foreground">
           {CATEGORY_LABELS[item.category]}
-          {item.subcategory && <span> Â· {item.subcategory}</span>}
+          {item.subcategory && <span> · {item.subcategory}</span>}
         </p>
         {item.description && (
           <p className="line-clamp-3 text-[11px]">{item.description}</p>
