@@ -23,12 +23,16 @@ async function driveRequest(url: string, token: string, options: RequestInit = {
   const res = await fetch(url, {
     ...options,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `******
       ...options.headers,
     },
   });
   if (!res.ok) throw new Error(`Drive API error: ${res.status}`);
-  return res.json();
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return res.json();
+  }
+  return null;
 }
 
 async function findOrCreateFolder(token: string): Promise<string> {
@@ -94,10 +98,9 @@ export function useGoogleDrive(accessToken: string | undefined) {
         ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
         : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 
-      await fetch(url, {
+      await driveRequest(url, accessToken, {
         method: fileId ? 'PATCH' : 'POST',
         headers: {
-          Authorization: `Bearer ${accessToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
         },
         body,
@@ -117,12 +120,10 @@ export function useGoogleDrive(accessToken: string | undefined) {
       const fileId = await findDataFile(accessToken, folderId);
       if (!fileId) { setSyncing(false); return null; }
 
-      const res = await fetch(
+      const data = await driveRequest(
         `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
+        accessToken
       );
-      if (!res.ok) { setSyncing(false); return null; }
-      const data = await res.json();
       setLastSync(Date.now());
       setSyncing(false);
       return data;
