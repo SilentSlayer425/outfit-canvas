@@ -8,12 +8,13 @@
  */
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { DRIVE_FOLDER_NAME, DRIVE_DATA_FILE } from '@/config';
-import type { ClothingItem, Outfit, CustomMainTag } from '@/types/closet';
+import type { ClothingItem, Outfit, CustomMainTag, Pairing } from '@/types/closet';
 
 interface DriveData {
   items: ClothingItem[];
   outfits: Outfit[];
   customMainTags?: CustomMainTag[];
+  pairings?: Pairing[];
   darkMode?: boolean;
   weatherCity?: string;
   weatherLat?: number;
@@ -95,7 +96,7 @@ export function useGoogleDrive(accessToken: string | undefined) {
     try {
       const folderId = await findOrCreateFolder(accessToken);
       const fileId = (await findLatestDataFile(accessToken)) ?? (await findDataFile(accessToken, folderId));
-      const jsonBody = JSON.stringify(data);
+      const jsonBody = JSON.stringify(data, null, 2);
 
       const metadata = { name: DRIVE_DATA_FILE, parents: fileId ? undefined : [folderId] };
       const boundary = '---BOUNDARY---';

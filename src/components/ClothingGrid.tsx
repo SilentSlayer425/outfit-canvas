@@ -15,7 +15,7 @@
 import { useState, useMemo, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Trash2, Pencil, Copy, Link2 } from 'lucide-react';
-import type { ClothingItem, ClothingCategory, CustomMainTag, Outfit } from '@/types/closet';
+import type { ClothingItem, ClothingCategory, CustomMainTag, Outfit, Pairing } from '@/types/closet';
 import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
 import { GRID_COLS, GRID_ITEM_STAGGER } from '@/config';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -37,10 +37,11 @@ interface ClothingGridProps {
   showItemHoverText?: boolean;
   customMainTags?: CustomMainTag[];
   outfits?: Outfit[];
+  pairings?: Pairing[];
 }
 
 export function ClothingGrid({
-  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, onDuplicate, selectable, showItemHoverText, customMainTags = [], outfits = [],
+  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, onDuplicate, selectable, showItemHoverText, customMainTags = [], outfits = [], pairings = [],
 }: ClothingGridProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [activeBrand, setActiveBrand] = useState<string | null>(null);
@@ -201,7 +202,7 @@ export function ClothingGrid({
               <div className="aspect-square p-2 relative">
                 <img src={item.imageData} alt={item.name} className="w-full h-full object-contain" />
                 {/* Pairing icon badge */}
-                {isItemPaired(item.id, outfits) && (
+                {isItemPaired(item.id, outfits, pairings) && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div className="absolute top-3 right-3 p-1.5 rounded-full bg-primary/90 text-primary-foreground">

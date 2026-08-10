@@ -13,11 +13,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Pencil, Trash2, Link2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { LinkToItemModal } from '@/components/LinkToItemModal';
 import type { ClothingItem, Outfit } from '@/types/closet';
 import { CATEGORY_LABELS } from '@/types/closet';
 import { getPairingInfo, isItemLinkable } from '@/lib/pairing-helpers';
+import type { Pairing } from '@/types/closet';
 
 interface ItemDetailModalProps {
   open: boolean;
@@ -27,15 +30,66 @@ interface ItemDetailModalProps {
   onDelete?: (item: ClothingItem) => void;
   outfits?: Outfit[];
   allItems?: ClothingItem[];
+  pairings?: Pairing[];
   onViewPairedItem?: (item: ClothingItem) => void;
+  onCreatePairing?: (accessoryId: string, mainItemIds: string[]) => void;
+  onUnlink?: (itemId: string, pairedItemId: string) => void;
 }
 
-export function ItemDetailModal({ open, item, onClose, onEdit, onDelete, outfits = [], allItems = [], onViewPairedItem }: ItemDetailModalProps) {
+export function ItemDetailModal({
+  open,
+  item,
+  onClose,
+  onEdit,
+  onDelete,
+  outfits,
+  allItems,
+  pairings,
+  onViewPairedItem,
+  onCreatePairing,
+  onUnlink,
+}: ItemDetailModalProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [unlinkConfirm, setUnlinkConfirm] = useState<{ itemId: string; pairedItemId: string } | null>(null);
 
   if (!item) return null;
 
-  const pairingInfo = getPairingInfo(item.id, outfits, allItems);
+  // Defensive: ensure outfits, allItems, and pairings are always arrays (handles undefined from parent)
+  const safeOutfits = outfits ?? [];
+  const safeAllItems = allItems ?? [];
+  const safePairings = pairings ?? [];
+
+  const pairingInfo = getPairingInfo(item.id, safeOutfits, safeAllItems, safePairings);
+
+  // Get main items (non-accessory items) for pairing
+  const mainItems = safeAllItems.filter((i) => !['accessories', 'jewelry', 'bags'].includes(i.category));
+
+  const handlePairItems = (accessoryId: string, selectedIds: string[]) => {
+    if (selectedIds.length === 0) return;
+
+    // Create outfit with pairings for all selected items at once
+    onCreatePairing?.(accessoryId, selectedIds);
+
+    const count = selectedIds.length;
+    toast.success(
+      `Linked ${item.name} to ${count} item${count !== 1 ? 's' : ''}`
+    );
+    setLinkModalOpen(false);
+  };
+
+  const handleConfirmUnlink = () => {
+    if (!unlinkConfirm) return;
+
+    const pairedItem = safeAllItems.find((i) => i.id === unlinkConfirm.pairedItemId);
+    onUnlink?.(unlinkConfirm.itemId, unlinkConfirm.pairedItemId);
+
+    if (pairedItem) {
+      toast.success(`Unlinked ${item?.name || 'item'} from ${pairedItem.name}`);
+    }
+
+    setUnlinkConfirm(null);
+  };
 
   return (
     <>
@@ -92,49 +146,73 @@ export function ItemDetailModal({ open, item, onClose, onEdit, onDelete, outfits
                   </div>
                 )}
 
-                {/* Pairing information */}
-                {isItemLinkable(item.category) && (outfits.length > 0) && (
+                {/* Pairing information — show for ALL items that have pairings */}
+                {(pairingInfo.pairedToItems.length > 0 || pairingInfo.pairedItems.length > 0) && (safeOutfits.length > 0) && (
                   <div className="space-y-3 pt-3 border-t border-border">
-                    {/* PAIRED WITH section */}
-                    {pairingInfo.pairedToItem && (
+                    {/* PAIRED WITH section — for items paired to something else */}
+                    {pairingInfo.pairedToItems.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Paired With</p>
-                        <button
-                          onClick={() => onViewPairedItem?.(pairingInfo.pairedToItem!)}
-                          className="w-full flex items-start gap-2 p-2 rounded-lg hover:bg-muted transition-colors text-left"
-                        >
-                          <div className="h-12 w-12 rounded bg-muted/50 flex-shrink-0">
-                            <img src={pairingInfo.pairedToItem.imageData} alt={pairingInfo.pairedToItem.name} className="w-full h-full object-contain" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{pairingInfo.pairedToItem.name}</p>
-                            <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[pairingInfo.pairedToItem.category]}</p>
-                          </div>
-                          <Link2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                        </button>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">Paired With ({pairingInfo.pairedToItems.length})</p>
+                        <div className="space-y-1">
+                          {pairingInfo.pairedToItems.map((pairedToItem) => (
+                            <div key={pairedToItem.id} className="group flex items-start gap-2 p-2 rounded-lg hover:bg-muted transition-colors">
+                              <button
+                                onClick={() => onViewPairedItem?.(pairedToItem)}
+                                className="w-full flex items-start gap-2 text-left"
+                              >
+                                <div className="h-12 w-12 rounded bg-muted/50 flex-shrink-0">
+                                  <img src={pairedToItem.imageData} alt={pairedToItem.name} className="w-full h-full object-contain" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-foreground truncate">{pairedToItem.name}</p>
+                                  <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[pairedToItem.category]}</p>
+                                </div>
+                                <Link2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                              </button>
+                              <button
+                                onClick={() => setUnlinkConfirm({ itemId: item.id, pairedItemId: pairedToItem.id })}
+                                className="ml-auto flex-shrink-0 p-1 rounded-md hover:bg-destructive/20 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Unlink from this item"
+                              >
+                                <X className="h-4 w-4 text-destructive" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
-                    {/* LINKED ACCESSORIES section */}
+                    {/* LINKED ITEMS section — for items that have things paired to them */}
                     {pairingInfo.pairedItems.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase">Linked Accessories ({pairingInfo.pairedItems.length})</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase">Linked Items ({pairingInfo.pairedItems.length})</p>
                         <div className="space-y-1">
                           {pairingInfo.pairedItems.map((pairedItem) => (
-                            <button
+                            <div
                               key={pairedItem.id}
-                              onClick={() => onViewPairedItem?.(pairedItem)}
-                              className="w-full flex items-start gap-2 p-2 rounded-lg hover:bg-muted transition-colors text-left"
+                              className="group flex items-start gap-2 p-2 rounded-lg hover:bg-muted transition-colors"
                             >
-                              <div className="h-10 w-10 rounded bg-muted/50 flex-shrink-0">
-                                <img src={pairedItem.imageData} alt={pairedItem.name} className="w-full h-full object-contain" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-foreground truncate">{pairedItem.name}</p>
-                                <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[pairedItem.category]}</p>
-                              </div>
-                              <Link2 className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
-                            </button>
+                              <button
+                                onClick={() => onViewPairedItem?.(pairedItem)}
+                                className="w-full flex items-start gap-2 text-left"
+                              >
+                                <div className="h-10 w-10 rounded bg-muted/50 flex-shrink-0">
+                                  <img src={pairedItem.imageData} alt={pairedItem.name} className="w-full h-full object-contain" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-foreground truncate">{pairedItem.name}</p>
+                                  <p className="text-[10px] text-muted-foreground">{CATEGORY_LABELS[pairedItem.category]}</p>
+                                </div>
+                                <Link2 className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
+                              </button>
+                              <button
+                                onClick={() => setUnlinkConfirm({ itemId: pairedItem.id, pairedItemId: item.id })}
+                                className="ml-auto flex-shrink-0 p-1 rounded-md hover:bg-destructive/20 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Unlink from this item"
+                              >
+                                <X className="h-3.5 w-3.5 text-destructive" />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -144,34 +222,54 @@ export function ItemDetailModal({ open, item, onClose, onEdit, onDelete, outfits
               </div>
 
               {/* Action buttons — only shown when callbacks provided */}
-              {(onEdit || onDelete) && (
-                <div className="flex gap-2 mt-4 pt-3 border-t border-border">
-                  {onEdit && (
+              {(onEdit || onDelete || (isItemLinkable(item.category) && mainItems.length > 0)) && (
+                <div className="flex flex-col gap-2 mt-4 pt-3 border-t border-border">
+                  {isItemLinkable(item.category) && mainItems.length > 0 && onCreatePairing && (
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 rounded-xl"
-                      onClick={() => onEdit(item)}
+                      className="w-full rounded-xl"
+                      onClick={() => setLinkModalOpen(true)}
                     >
-                      <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+                      <Link2 className="w-3.5 h-3.5 mr-1.5" /> Link to Item
                     </Button>
                   )}
-                  {onDelete && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 rounded-xl text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                      onClick={() => setConfirmDelete(true)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
-                    </Button>
-                  )}
+                  <div className="flex gap-2">
+                    {onEdit && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 rounded-xl"
+                        onClick={() => onEdit(item)}
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 rounded-xl text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => setConfirmDelete(true)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      <LinkToItemModal
+        open={linkModalOpen}
+        onClose={() => setLinkModalOpen(false)}
+        onConfirm={handlePairItems}
+        items={safeAllItems}
+        preselectedAccessoryId={item.id}
+      />
 
       <ConfirmDialog
         open={confirmDelete}
@@ -180,6 +278,16 @@ export function ItemDetailModal({ open, item, onClose, onEdit, onDelete, outfits
         onConfirm={() => { setConfirmDelete(false); onDelete?.(item); }}
         onCancel={() => setConfirmDelete(false)}
       />
+
+      {unlinkConfirm && (
+        <ConfirmDialog
+          open={true}
+          title="Unlink Items"
+          message={`Unlink ${item?.name} from ${safeAllItems.find((i) => i.id === unlinkConfirm.pairedItemId)?.name}?`}
+          onConfirm={handleConfirmUnlink}
+          onCancel={() => setUnlinkConfirm(null)}
+        />
+      )}
     </>
   );
 }

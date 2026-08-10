@@ -103,8 +103,24 @@ export interface CustomMainTag {
 }
 
 /**
+ * Pairing between an accessory and one or more main items
+ * Feature: Accessory Pairing
+ * Allows storing global pairings independent of specific outfits
+ */
+export interface Pairing {
+  id: string;
+  /** ID of the accessory being paired (jewelry, bag, or accessories category) */
+  accessoryId: string;
+  /** IDs of main items this accessory is paired with */
+  linkedItemIds: string[];
+  /** Notes about this pairing */
+  notes?: string;
+  createdAt: number;
+}
+
+/**
  * Complete closet state including all items, outfits, and user preferences
- * Feature: Custom Main Tags
+ * Feature: Custom Main Tags, Accessory Pairing
  */
 export interface ClosetState {
   items: ClothingItem[];
@@ -115,6 +131,8 @@ export interface ClosetState {
   weatherLon?: number;
   /** Custom main tags (categories) created by the user */
   customMainTags?: CustomMainTag[];
+  /** Global accessory pairings independent of outfits */
+  pairings?: Pairing[];
 }
 
 export const CATEGORY_LABELS: Record<ClothingCategory, string> = {

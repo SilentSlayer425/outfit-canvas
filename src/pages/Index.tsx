@@ -29,6 +29,7 @@ import { ClothingGrid } from '@/components/ClothingGrid';
 import { OutfitCanvas } from '@/components/OutfitCanvas';
 import { RearCanvas } from '@/components/RearCanvas';
 import { SavedOutfits } from '@/components/SavedOutfits';
+import { SavedLinks } from '@/components/SavedLinks';
 import { DonationPage } from '@/components/DonationPage';
 import { WeatherWidget } from '@/components/WeatherWidget';
 import { CATEGORY_Y_DEFAULTS, CATEGORY_X_DEFAULTS, PAGE_TRANSITION_DURATION } from '@/config';
@@ -53,7 +54,7 @@ interface IndexProps {
 }
 
 export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDarkMode }: IndexProps) {
-  const { items, outfits, customMainTags, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll, duplicateItem, addCustomTag, deleteCustomTag, createOutfitWithPairing } = useCloset();
+  const { items, outfits, customMainTags, pairings, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll, duplicateItem, addCustomTag, deleteCustomTag, createPairing, updatePairing, removePairing } = useCloset();
   const { saveToDrive, loadFromDrive, syncing, lastSync } = useGoogleDrive(user.accessToken);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -86,7 +87,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     if (!ready) return;
     loadFromDrive().then((data) => {
       if (data) {
-        replaceAll(data.items || [], data.outfits || [], data.customMainTags || []);
+        replaceAll(data.items || [], data.outfits || [], data.customMainTags || [], data.pairings || []);
         if (data.weatherCity) {
           setWeatherCity(data.weatherCity);
           setWeatherLat(data.weatherLat ?? null);
@@ -104,10 +105,10 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
   useEffect(() => {
     if (!ready || !driveLoaded.current) return;
     const timer = setTimeout(() => {
-      saveToDrive({ items, outfits, customMainTags, weatherCity, weatherLat, weatherLon, darkMode } as any);
+      saveToDrive({ items, outfits, customMainTags, pairings, weatherCity, weatherLat, weatherLon, darkMode } as any);
     }, 2000);
     return () => clearTimeout(timer);
-  }, [items, outfits, customMainTags, weatherCity, weatherLat, weatherLon, darkMode, saveToDrive, ready]);
+  }, [items, outfits, customMainTags, pairings, weatherCity, weatherLat, weatherLon, darkMode, saveToDrive, ready]);
 
   const handleUpload = useCallback((data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; brand?: string; imageData: string }) => {
     // Explicitly structure data to match addItem parameter type
@@ -146,7 +147,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     const itemNames: string[] = [item.name];
 
     // Find linked items: items this is paired to AND items paired to this
-    const pairingInfo = getPairingInfo(item.id, outfits, items);
+    const pairingInfo = getPairingInfo(item.id, outfits, items, pairings);
     const linkedItems = [
       ...pairingInfo.pairedToItems,
       ...pairingInfo.pairedItems,
@@ -192,7 +193,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
         `Added ${item.name} and ${linkedCount} linked item${linkedCount !== 1 ? 's' : ''}`
       );
     }
-  }, [addToSide, customMainTags, items, outfits, outfitItems]);
+  }, [addToSide, customMainTags, items, outfits, outfitItems, pairings]);
 
   const updateOutfitItem = useCallback((index: number, updates: Partial<OutfitItem>) => {
     setOutfitItems((prev) => prev.map((oi, i) => (i === index ? { ...oi, ...updates } : oi)));
@@ -219,7 +220,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
   }, []);
 
   const handleDeleteAllData = useCallback(() => {
-    replaceAll([], [], []);
+    replaceAll([], [], [], []);
     setConfirmDeleteAll(false);
   }, [replaceAll]);
 
@@ -234,7 +235,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
       return;
     }
 
-    replaceAll(data.items || [], data.outfits || [], data.customMainTags || []);
+    replaceAll(data.items || [], data.outfits || [], data.customMainTags || [], data.pairings || []);
     if (data.weatherCity) {
       setWeatherCity(data.weatherCity);
       setWeatherLat(data.weatherLat ?? null);
@@ -269,11 +270,73 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     }
   }, [deleteCustomTag, customMainTags]);
 
+  const handleUnlink = useCallback((itemId: string, pairedItemId: string) => {
+    // Find outfits that contain the pairing relationship between these two items
+    const updatedOutfits = outfits.map((outfit) => {
+      let hasChanges = false;
+
+      // Update all outfit items that have pairing relationships
+      const updatedItems = outfit.items.map((outfitItem) => {
+        if (outfitItem.clothingId === itemId && outfitItem.pairedToClothingIds?.includes(pairedItemId)) {
+          hasChanges = true;
+          return {
+            ...outfitItem,
+            pairedToClothingIds: outfitItem.pairedToClothingIds.filter((id) => id !== pairedItemId),
+          };
+        }
+        return outfitItem;
+      });
+
+      if (hasChanges) {
+        // Check if the outfit still has any pairings
+        const hasPairings = updatedItems.some((oi) => oi.pairedToClothingIds && oi.pairedToClothingIds.length > 0);
+
+        // If no more pairings, mark outfit for deletion
+        if (!hasPairings) {
+          return null; // Mark for deletion
+        }
+
+        return { ...outfit, items: updatedItems };
+      }
+
+      return outfit;
+    }).filter((outfit): outfit is Outfit => outfit !== null);
+
+    // Only update if there were changes
+    if (updatedOutfits.length !== outfits.length || updatedOutfits.some((o, i) => o.items !== outfits[i]?.items)) {
+      replaceAll(items, updatedOutfits, customMainTags, pairings);
+    }
+
+    // Also clean up the matching global pairing (created from the closet's Link to Item flow)
+    pairings.forEach((pairing) => {
+      let accessoryId: string | null = null;
+      let targetId: string | null = null;
+
+      if (pairing.accessoryId === itemId && pairing.linkedItemIds.includes(pairedItemId)) {
+        accessoryId = itemId;
+        targetId = pairedItemId;
+      } else if (pairing.accessoryId === pairedItemId && pairing.linkedItemIds.includes(itemId)) {
+        accessoryId = pairedItemId;
+        targetId = itemId;
+      }
+
+      if (accessoryId && targetId) {
+        const remaining = pairing.linkedItemIds.filter((id) => id !== targetId);
+        if (remaining.length === 0) {
+          removePairing(pairing.id);
+        } else {
+          updatePairing(pairing.id, { linkedItemIds: remaining });
+        }
+      }
+    });
+  }, [outfits, items, customMainTags, pairings, replaceAll, updatePairing, removePairing]);
+
   const headerTitle: Record<Tab, string> = {
     home: 'Home',
     closet: 'My Closet',
     builder: 'Build Outfit',
     outfits: 'Saved Outfits',
+    pairings: 'Item Pairings',
     donate: 'Support',
   };
 
@@ -397,6 +460,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                 onDuplicate={handleDuplicateItem}
                 customMainTags={customMainTags}
                 outfits={outfits}
+                pairings={pairings}
               />
             </motion.div>
           )}
@@ -461,6 +525,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       showItemHoverText
                       customMainTags={customMainTags}
                       outfits={outfits}
+                      pairings={pairings}
                     />
                   </div>
                 </div>
@@ -495,6 +560,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       showItemHoverText
                       customMainTags={customMainTags}
                       outfits={outfits}
+                      pairings={pairings}
                     />
                   </div>
                   <div className="w-1/3 flex flex-col gap-4 sticky top-24 self-start h-fit">
@@ -532,6 +598,21 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
             </motion.div>
           )}
 
+          {tab === 'pairings' && (
+            <motion.div key="pairings" variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: PAGE_TRANSITION_DURATION }}>
+              <SavedLinks
+                pairings={pairings}
+                items={items}
+                getItemById={getItemById}
+                onCreatePairing={createPairing}
+                onUpdatePairing={updatePairing}
+                onRemovePairing={removePairing}
+                onEditItem={setEditItem}
+                onDeleteItem={removeItem}
+              />
+            </motion.div>
+          )}
+
           {tab === 'donate' && (
             <motion.div key="donate" variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: PAGE_TRANSITION_DURATION }}>
               <DonationPage />
@@ -551,8 +632,10 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
         onDelete={(item) => { setViewItem(null); removeItem(item.id); }}
         outfits={outfits}
         allItems={items}
+        pairings={pairings}
         onViewPairedItem={setViewItem}
-        onCreatePairing={createOutfitWithPairing}
+        onCreatePairing={createPairing}
+        onUnlink={handleUnlink}
       />
       <ConfirmDialog
         open={confirmDeleteAll}

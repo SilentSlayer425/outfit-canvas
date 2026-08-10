@@ -12,13 +12,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  message: string;
+  message?: string;
+  description?: string;
   confirmLabel?: string;
+  confirmText?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  isDangerous?: boolean;
 }
 
-export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', onConfirm, onCancel }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, description, confirmLabel, confirmText, onConfirm, onCancel, isDangerous }: ConfirmDialogProps) {
+  const finalMessage = message || description || '';
+  const finalConfirmLabel = confirmLabel || confirmText || 'Delete';
   return (
     <AnimatePresence>
       {open && (
@@ -36,7 +41,7 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', o
             exit={{ scale: 0.95, opacity: 0 }}
           >
             <h3 className="text-lg font-heading font-semibold text-foreground mb-2">{title}</h3>
-            <p className="text-sm text-muted-foreground mb-5">{message}</p>
+            <p className="text-sm text-muted-foreground mb-5">{finalMessage}</p>
             <div className="flex gap-3">
               <button
                 onClick={onCancel}
@@ -46,9 +51,9 @@ export function ConfirmDialog({ open, title, message, confirmLabel = 'Delete', o
               </button>
               <button
                 onClick={onConfirm}
-                className="flex-1 rounded-xl py-2.5 text-sm font-semibold bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-colors ${isDangerous ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
               >
-                {confirmLabel}
+                {finalConfirmLabel}
               </button>
             </div>
           </motion.div>
