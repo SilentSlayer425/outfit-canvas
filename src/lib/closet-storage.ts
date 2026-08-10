@@ -1,9 +1,4 @@
-import type { ClothingItem, Outfit } from '@/types/closet';
-
-interface ClosetState {
-  items: ClothingItem[];
-  outfits: Outfit[];
-}
+import type { ClosetState } from '@/types/closet';
 
 // Browser database name — change this to rename the local IndexedDB store
 const DB_NAME = 'closet-studio-db';
@@ -15,7 +10,7 @@ const STATE_KEY = 'current';
 const LEGACY_ITEMS_KEY = 'closet-items';
 const LEGACY_OUTFITS_KEY = 'closet-outfits';
 
-const EMPTY_STATE: ClosetState = { items: [], outfits: [] };
+const EMPTY_STATE: ClosetState = { items: [], outfits: [], customMainTags: [] };
 
 const hasIndexedDb = () => typeof window !== 'undefined' && 'indexedDB' in window;
 
@@ -51,6 +46,7 @@ const openDatabase = () =>
 export const readLegacyClosetState = (): ClosetState => ({
   items: loadLegacyValue(LEGACY_ITEMS_KEY, []),
   outfits: loadLegacyValue(LEGACY_OUTFITS_KEY, []),
+  customMainTags: [],
 });
 
 export const clearLegacyClosetState = () => {

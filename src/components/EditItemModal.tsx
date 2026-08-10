@@ -16,23 +16,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { ClothingItem, ClothingCategory } from '@/types/closet';
+import type { ClothingItem, ClothingCategory, CustomMainTag } from '@/types/closet';
 import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
+import { getMergedCategoryOptions, getCategorySubcategories } from '@/lib/category-helpers';
 
 interface EditItemModalProps {
   open: boolean;
   item: ClothingItem | null;
   onClose: () => void;
-  onSave: (id: string, updates: Partial<Pick<ClothingItem, 'name' | 'category' | 'subcategory' | 'customTags' | 'description'>>) => void;
+  customMainTags?: CustomMainTag[];
+  onSave: (id: string, updates: Partial<Pick<ClothingItem, 'name' | 'category' | 'subcategory' | 'customTags' | 'description' | 'brand'>>) => void;
 }
 
-export function EditItemModal({ open, item, onClose, onSave }: EditItemModalProps) {
+export function EditItemModal({ open, item, onClose, customMainTags = [], onSave }: EditItemModalProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ClothingCategory>('tops');
   const [subcategory, setSubcategory] = useState<string>('');
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [description, setDescription] = useState('');
+  const [brand, setBrand] = useState('');
+  const categoryOptions = getMergedCategoryOptions(customMainTags);
 
   useEffect(() => {
     if (item) {
@@ -41,6 +45,7 @@ export function EditItemModal({ open, item, onClose, onSave }: EditItemModalProp
       setSubcategory(item.subcategory || '');
       setCustomTags(item.customTags || []);
       setDescription(item.description || '');
+      setBrand(item.brand || '');
       setNewTag('');
     }
   }, [item]);
@@ -66,11 +71,12 @@ export function EditItemModal({ open, item, onClose, onSave }: EditItemModalProp
       subcategory: subcategory || undefined,
       customTags: customTags.length > 0 ? customTags : undefined,
       description: description.trim() || undefined,
+      brand: brand.trim() || undefined,
     });
     onClose();
   };
 
-  const availableSubs = SUBCATEGORIES[category] || [];
+  const availableSubs = getCategorySubcategories(category, customMainTags);
 
   return (
     <AnimatePresence>
@@ -126,9 +132,9 @@ export function EditItemModal({ open, item, onClose, onSave }: EditItemModalProp
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORY_ORDER.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
+                  {categoryOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -148,6 +154,14 @@ export function EditItemModal({ open, item, onClose, onSave }: EditItemModalProp
                   </SelectContent>
                 </Select>
               )}
+
+              {/* Brand — optional text input */}
+              <Input
+                placeholder="Brand (optional)"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                className="rounded-xl bg-background"
+              />
 
               {/* Custom tags */}
               <div>

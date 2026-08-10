@@ -14,12 +14,14 @@
  */
 import { useState, useMemo, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, Pencil } from 'lucide-react';
-import type { ClothingItem, ClothingCategory } from '@/types/closet';
+import { Trash2, Pencil, Copy } from 'lucide-react';
+import type { ClothingItem, ClothingCategory, CustomMainTag } from '@/types/closet';
 import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
 import { GRID_COLS, GRID_ITEM_STAGGER } from '@/config';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getMergedCategoryOrder, getCategoryLabel } from '@/lib/category-helpers';
 
 interface ClothingGridProps {
   items: ClothingItem[];
@@ -29,15 +31,19 @@ interface ClothingGridProps {
   onSelect?: (item: ClothingItem) => void;
   onEdit?: (item: ClothingItem) => void;
   onView?: (item: ClothingItem) => void;
+  onDuplicate?: (id: string) => void;
   selectable?: boolean;
   showItemHoverText?: boolean;
+  customMainTags?: CustomMainTag[];
 }
 
 export function ClothingGrid({
-  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, selectable, showItemHoverText,
+  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, onDuplicate, selectable, showItemHoverText, customMainTags = [],
 }: ClothingGridProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeBrand, setActiveBrand] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const mergedCategoryOrder = getMergedCategoryOrder(customMainTags);
 
   // Get all tags (built-in subs + custom) for the active category
   const availableTags = useMemo(() => {
@@ -67,12 +73,37 @@ export function ClothingGrid({
     if (activeTag) {
       list = list.filter((i) => i.subcategory === activeTag || i.customTags?.includes(activeTag));
     }
+    if (activeBrand) {
+      list = list.filter((i) => i.brand === activeBrand);
+    }
     return list;
+  }, [items, activeCategory, activeTag, activeBrand]);
+
+  // Get all brands for the currently visible items (after category/tag filtering, before brand filtering)
+  const availableBrands = useMemo(() => {
+    let list = activeCategory === 'all' ? items : items.filter((i) => i.category === activeCategory);
+    if (activeTag) {
+      list = list.filter((i) => i.subcategory === activeTag || i.customTags?.includes(activeTag));
+    }
+    const brandSet = new Set<string>();
+    list.forEach((i) => {
+      if (i.brand) {
+        brandSet.add(i.brand);
+      }
+    });
+    const brands: { label: string; count: number }[] = [];
+    brandSet.forEach((brand) => {
+      const count = list.filter((i) => i.brand === brand).length;
+      if (count > 0) brands.push({ label: brand, count });
+    });
+    // Sort brands alphabetically
+    return brands.sort((a, b) => a.label.localeCompare(b.label));
   }, [items, activeCategory, activeTag]);
 
-  // Reset tag when category changes
+  // Reset tag and brand when category changes
   const handleCategoryChange = (cat: ClothingCategory | 'all') => {
     setActiveTag(null);
+    setActiveBrand(null);
     onCategoryChange(cat);
   };
 
@@ -88,10 +119,10 @@ export function ClothingGrid({
       {/* Category filter pills — scrollable row */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
         <CategoryPill label="All" active={activeCategory === 'all'} onClick={() => handleCategoryChange('all')} />
-        {CATEGORY_ORDER.map((cat) => (
+        {mergedCategoryOrder.map((cat) => (
           <CategoryPill
             key={cat}
-            label={CATEGORY_LABELS[cat]}
+            label={getCategoryLabel(cat, customMainTags)}
             active={activeCategory === cat}
             onClick={() => handleCategoryChange(cat)}
             count={items.filter(i => i.category === cat).length}
@@ -121,6 +152,25 @@ export function ClothingGrid({
               {label} <span className="opacity-60">{count}</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Brand filter dropdown */}
+      {availableBrands.length > 0 && (
+        <div className="flex gap-2 mb-4">
+          <Select value={activeBrand || ''} onValueChange={(value) => setActiveBrand(value || null)}>
+            <SelectTrigger className="w-40 rounded-xl bg-background text-xs">
+              <SelectValue placeholder="All brands" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All brands</SelectItem>
+              {availableBrands.map(({ label, count }) => (
+                <SelectItem key={label} value={label}>
+                  {label} <span className="text-muted-foreground">({count})</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
 
@@ -154,6 +204,7 @@ export function ClothingGrid({
                 <p className="text-xs text-muted-foreground">
                   {CATEGORY_LABELS[item.category]}
                   {item.subcategory && <span className="ml-1">· {item.subcategory}</span>}
+                  {item.brand && <span className="ml-1">· {item.brand}</span>}
                 </p>
                 {/* Custom tags */}
                 {item.customTags && item.customTags.length > 0 && (
@@ -173,14 +224,26 @@ export function ClothingGrid({
                     <button
                       onClick={(e) => { e.stopPropagation(); onEdit(item); }}
                       className="p-1.5 rounded-full bg-card/80 backdrop-blur-sm hover:bg-muted"
+                      title="Edit item"
                     >
                       <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {/* Duplicate button */}
+                  {onDuplicate && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDuplicate(item.id); }}
+                      className="p-1.5 rounded-full bg-card/80 backdrop-blur-sm hover:bg-primary hover:text-primary-foreground"
+                      title="Duplicate item"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {/* Delete button — triggers confirm dialog */}
                   <button
                     onClick={(e) => { e.stopPropagation(); setDeleteTarget(item.id); }}
                     className="p-1.5 rounded-full bg-card/80 backdrop-blur-sm hover:bg-destructive hover:text-destructive-foreground"
+                    title="Delete item"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -218,6 +281,7 @@ function ItemHoverTooltip({ item, enabled, children }: {
         <p className="text-[11px] text-muted-foreground">
           {CATEGORY_LABELS[item.category]}
           {item.subcategory && <span> · {item.subcategory}</span>}
+          {item.brand && <span> · {item.brand}</span>}
         </p>
         {item.description && (
           <p className="line-clamp-3 text-[11px]">{item.description}</p>

@@ -26,6 +26,7 @@ import { EditItemModal } from '@/components/EditItemModal';
 import { ItemDetailModal } from '@/components/ItemDetailModal';
 import { ClothingGrid } from '@/components/ClothingGrid';
 import { OutfitCanvas } from '@/components/OutfitCanvas';
+import { RearCanvas } from '@/components/RearCanvas';
 import { SavedOutfits } from '@/components/SavedOutfits';
 import { DonationPage } from '@/components/DonationPage';
 import { WeatherWidget } from '@/components/WeatherWidget';
@@ -33,6 +34,7 @@ import { CATEGORY_Y_DEFAULTS, CATEGORY_X_DEFAULTS, PAGE_TRANSITION_DURATION } fr
 import type { ClothingCategory, ClothingItem, OutfitItem, Outfit } from '@/types/closet';
 import type { GoogleUser } from '@/hooks/useGoogleAuth';
 import { goToSubdomain } from '@/utils/navigation';
+import { getCategoryDefaults } from '@/lib/category-helpers';
 
 const pageVariants = {
   initial: { opacity: 0, x: 20 },
@@ -49,7 +51,7 @@ interface IndexProps {
 }
 
 export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDarkMode }: IndexProps) {
-  const { items, outfits, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll } = useCloset();
+  const { items, outfits, customMainTags, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll, duplicateItem } = useCloset();
   const { saveToDrive, loadFromDrive, syncing, lastSync } = useGoogleDrive(user.accessToken);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -59,6 +61,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
   const [viewItem, setViewItem] = useState<ClothingItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<ClothingCategory | 'all'>('all');
   const [outfitItems, setOutfitItems] = useState<OutfitItem[]>([]);
+  const [addToSide, setAddToSide] = useState<'front' | 'back'>('front');
   const [weatherCity, setWeatherCity] = useState<string | null>(null);
   const [weatherLat, setWeatherLat]   = useState<number | null>(null);
   const [weatherLon, setWeatherLon]   = useState<number | null>(null);
@@ -80,11 +83,11 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     if (!ready) return;
     loadFromDrive().then((data) => {
       if (data) {
-        replaceAll(data.items || [], data.outfits || []);
+        replaceAll(data.items || [], data.outfits || [], data.customMainTags || []);
         if (data.weatherCity) {
           setWeatherCity(data.weatherCity);
-          setWeatherLat(data.weatherLat ?? null); // add
-          setWeatherLon(data.weatherLon ?? null); // add
+          setWeatherLat(data.weatherLat ?? null);
+          setWeatherLon(data.weatherLon ?? null);
         }
         if (data.darkMode !== undefined) {
           setDarkMode(data.darkMode);
@@ -96,30 +99,37 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
 
   // Auto-save to Drive
   useEffect(() => {
-    if (!ready || !driveLoaded.current) return; // ← add !driveLoaded.current
+    if (!ready || !driveLoaded.current) return;
     const timer = setTimeout(() => {
-      saveToDrive({ items, outfits, weatherCity, weatherLat, weatherLon, darkMode } as any); // ← add weatherLat, weatherLon
+      saveToDrive({ items, outfits, customMainTags, weatherCity, weatherLat, weatherLon, darkMode } as any);
     }, 2000);
     return () => clearTimeout(timer);
-  }, [items, outfits, weatherCity, weatherLat, weatherLon, darkMode, saveToDrive, ready]); // ← add weatherLat, weatherLon
+  }, [items, outfits, customMainTags, weatherCity, weatherLat, weatherLon, darkMode, saveToDrive, ready]);
 
-  const handleUpload = useCallback((data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; imageData: string }) => {
+  const handleUpload = useCallback((data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; brand?: string; imageData: string }) => {
     addItem(data);
   }, [addItem]);
 
   const addToOutfit = useCallback((item: ClothingItem) => {
+    const defaults = getCategoryDefaults(
+      item.category,
+      customMainTags,
+      CATEGORY_X_DEFAULTS[item.category] ?? 0,
+      CATEGORY_Y_DEFAULTS[item.category] ?? 0
+    );
     setOutfitItems((prev) => [
       ...prev,
       {
         clothingId: item.id,
         category: item.category,
-        x: CATEGORY_X_DEFAULTS[item.category] ?? 0,
-        y: CATEGORY_Y_DEFAULTS[item.category] ?? 0,
+        x: defaults.x,
+        y: defaults.y,
         scale: 1,
         zIndex: prev.length + 1,
+        side: addToSide,
       },
     ]);
-  }, []);
+  }, [addToSide, customMainTags]);
 
   const updateOutfitItem = useCallback((index: number, updates: Partial<OutfitItem>) => {
     setOutfitItems((prev) => prev.map((oi, i) => (i === index ? { ...oi, ...updates } : oi)));
@@ -146,7 +156,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
   }, []);
 
   const handleDeleteAllData = useCallback(() => {
-    replaceAll([], []);
+    replaceAll([], [], []);
     setConfirmDeleteAll(false);
   }, [replaceAll]);
 
@@ -161,7 +171,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
       return;
     }
 
-    replaceAll(data.items || [], data.outfits || []);
+    replaceAll(data.items || [], data.outfits || [], data.customMainTags || []);
     if (data.weatherCity) {
       setWeatherCity(data.weatherCity);
       setWeatherLat(data.weatherLat ?? null);
@@ -171,7 +181,16 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
       setDarkMode(data.darkMode);
     }
     toast.success('Hard resync complete.');
-  }, [loadFromDrive, replaceAll, setDarkMode, setWeatherCity, setWeatherLat, setWeatherLon]);
+  }, [loadFromDrive, replaceAll, setDarkMode]);
+
+  const handleDuplicateItem = useCallback((itemId: string) => {
+    const newItemId = duplicateItem(itemId);
+    if (newItemId) {
+      const item = items.find((i) => i.id === itemId);
+      const itemName = item?.name || 'Item';
+      toast.success(`${itemName} duplicated`);
+    }
+  }, [duplicateItem, items]);
 
   const headerTitle: Record<Tab, string> = {
     home: 'Home',
@@ -293,6 +312,8 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                 onRemove={removeItem}
                 onEdit={setEditItem}
                 onView={setViewItem}
+                onDuplicate={handleDuplicateItem}
+                customMainTags={customMainTags}
               />
             </motion.div>
           )}
@@ -304,7 +325,27 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
 
               {isMobile ? (
                 <div className="flex flex-col gap-4">
+                  {/* Side selector */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => setAddToSide('front')}
+                      variant={addToSide === 'front' ? 'default' : 'outline'}
+                      className="flex-1 rounded-xl"
+                    >
+                      Front
+                    </Button>
+                    <Button
+                      onClick={() => setAddToSide('back')}
+                      variant={addToSide === 'back' ? 'default' : 'outline'}
+                      className="flex-1 rounded-xl"
+                    >
+                      Back
+                    </Button>
+                  </div>
+
+                  {/* Front canvas */}
                   <div className="rounded-2xl border border-border p-4">
+                    <h3 className="mb-3 font-heading font-semibold text-foreground">Front View</h3>
                     <OutfitCanvas
                       outfitItems={outfitItems}
                       getItemById={getItemById}
@@ -313,6 +354,18 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       onSave={handleSaveOutfit}
                     />
                   </div>
+
+                  {/* Back canvas */}
+                  <div className="rounded-2xl border border-border p-4">
+                    <h3 className="mb-3 font-heading font-semibold text-foreground">Back View</h3>
+                    <RearCanvas
+                      outfitItems={outfitItems}
+                      getItemById={getItemById}
+                      onUpdateItem={updateOutfitItem}
+                      onRemoveItem={removeOutfitItem}
+                    />
+                  </div>
+
                   <div>
                     <h3 className="mb-3 font-heading font-semibold text-foreground">Add from closet</h3>
                     <ClothingGrid
@@ -323,12 +376,30 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       onSelect={addToOutfit}
                       selectable
                       showItemHoverText
+                      customMainTags={customMainTags}
                     />
                   </div>
                 </div>
               ) : (
                 <div className="flex gap-4">
                   <div className="w-2/3 overflow-y-auto">
+                    {/* Side selector */}
+                    <div className="flex gap-2 mb-4">
+                      <Button
+                        onClick={() => setAddToSide('front')}
+                        variant={addToSide === 'front' ? 'default' : 'outline'}
+                        className="flex-1 rounded-xl"
+                      >
+                        Front
+                      </Button>
+                      <Button
+                        onClick={() => setAddToSide('back')}
+                        variant={addToSide === 'back' ? 'default' : 'outline'}
+                        className="flex-1 rounded-xl"
+                      >
+                        Back
+                      </Button>
+                    </div>
                     <h3 className="mb-3 font-heading font-semibold text-foreground">Add from closet</h3>
                     <ClothingGrid
                       items={items}
@@ -338,16 +409,32 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       onSelect={addToOutfit}
                       selectable
                       showItemHoverText
+                      customMainTags={customMainTags}
                     />
                   </div>
-                  <div className="w-1/3 rounded-2xl border border-border p-4 sticky top-24 self-start">
-                    <OutfitCanvas
-                      outfitItems={outfitItems}
-                      getItemById={getItemById}
-                      onUpdateItem={updateOutfitItem}
-                      onRemoveItem={removeOutfitItem}
-                      onSave={handleSaveOutfit}
-                    />
+                  <div className="w-1/3 flex flex-col gap-4 sticky top-24 self-start h-fit">
+                    {/* Front canvas */}
+                    <div className="rounded-2xl border border-border p-4">
+                      <h3 className="mb-3 font-heading font-semibold text-foreground">Front</h3>
+                      <OutfitCanvas
+                        outfitItems={outfitItems}
+                        getItemById={getItemById}
+                        onUpdateItem={updateOutfitItem}
+                        onRemoveItem={removeOutfitItem}
+                        onSave={handleSaveOutfit}
+                      />
+                    </div>
+
+                    {/* Back canvas */}
+                    <div className="rounded-2xl border border-border p-4">
+                      <h3 className="mb-3 font-heading font-semibold text-foreground">Back</h3>
+                      <RearCanvas
+                        outfitItems={outfitItems}
+                        getItemById={getItemById}
+                        onUpdateItem={updateOutfitItem}
+                        onRemoveItem={removeOutfitItem}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
@@ -368,8 +455,8 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
         </AnimatePresence>
       </main>
 
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} onUpload={handleUpload} />
-      <EditItemModal open={!!editItem} item={editItem} onClose={() => setEditItem(null)} onSave={updateItem} />
+      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} customMainTags={customMainTags} onUpload={handleUpload} />
+      <EditItemModal open={!!editItem} item={editItem} onClose={() => setEditItem(null)} customMainTags={customMainTags} onSave={updateItem} />
       <ItemDetailModal
         open={!!viewItem}
         item={viewItem}

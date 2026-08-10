@@ -23,7 +23,25 @@ export type ClothingCategory =
   | 'shoes'
   | 'accessories'
   | 'bags'
-  | 'jewelry';
+  | 'jewelry'
+  | string; // allows custom main tags created by users. Feature: Custom Main Tags
+
+/**
+ * Image data for a clothing item with optional crop and alt text
+ * Feature: Alt Images, Cropping & Compression
+ */
+export interface ClothingImage {
+  imageData: string; // optimized image data URL (metadata stripped during processing)
+  altText?: string;
+  crop?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number; // rotation in degrees
+  };
+  createdAt: number;
+}
 
 export interface ClothingItem {
   id: string;
@@ -35,8 +53,16 @@ export interface ClothingItem {
   customTags?: string[];
   /** User-written description for this item */
   description?: string;
-  imageData: string; // optimized image data URL (metadata stripped during processing)
+  imageData: string; // optimized image data URL (metadata stripped during processing) - kept for backward compatibility
+  /** Multiple images with optional crop and alt text. Feature: Alt Images, Cropping & Compression */
+  images?: ClothingImage[];
   color?: string;
+  /** Brand of the item. Feature: Brand Tagging */
+  brand?: string;
+  /** ID of the item this was duplicated from. Feature: Duplicate Items (Phase 1) */
+  duplicatedFromId?: string;
+  /** Whether this item is a duplicate of another. Feature: Duplicate Items (Phase 1) */
+  isDuplicate?: boolean;
   createdAt: number;
 }
 
@@ -47,6 +73,10 @@ export interface OutfitItem {
   y: number;
   scale: number;
   zIndex: number;
+  /** Which side of the person the item is on. Feature: Canvas: Back of Person (Phase 1) */
+  side?: 'front' | 'back'; // defaults to 'front' for backward compatibility
+  /** ID of another item this is paired with for coordinated outfit building. Feature: Accessory Pairing */
+  pairedToClothingId?: string;
 }
 
 export interface Outfit {
@@ -54,6 +84,37 @@ export interface Outfit {
   name: string;
   items: OutfitItem[];
   createdAt: number;
+}
+
+/**
+ * Custom main tag (category) created by users
+ * Feature: Custom Main Tags
+ */
+export interface CustomMainTag {
+  id: string;
+  label: string;
+  /** Subcategories available within this custom tag */
+  subcategories?: string[];
+  /** Default X position for items of this category on the outfit canvas */
+  defaultX?: number;
+  /** Default Y position for items of this category on the outfit canvas */
+  defaultY?: number;
+  createdAt: number;
+}
+
+/**
+ * Complete closet state including all items, outfits, and user preferences
+ * Feature: Custom Main Tags
+ */
+export interface ClosetState {
+  items: ClothingItem[];
+  outfits: Outfit[];
+  darkMode?: boolean;
+  weatherCity?: string;
+  weatherLat?: number;
+  weatherLon?: number;
+  /** Custom main tags (categories) created by the user */
+  customMainTags?: CustomMainTag[];
 }
 
 export const CATEGORY_LABELS: Record<ClothingCategory, string> = {

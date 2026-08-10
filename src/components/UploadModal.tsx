@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { ClothingCategory } from '@/types/closet';
+import type { ClothingCategory, CustomMainTag } from '@/types/closet';
 import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
 import {
   isHeicLike,
@@ -22,25 +22,29 @@ import {
   normalizeImageFile,
   SUPPORTED_IMAGE_FORMAT_LABEL,
 } from '@/lib/image-processing';
+import { getMergedCategoryOptions, getCategorySubcategories } from '@/lib/category-helpers';
 
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
-  onUpload: (data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; imageData: string }) => void;
+  customMainTags?: CustomMainTag[];
+  onUpload: (data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; brand?: string; imageData: string }) => void;
 }
 
-export function UploadModal({ open, onClose, onUpload }: UploadModalProps) {
+export function UploadModal({ open, onClose, customMainTags = [], onUpload }: UploadModalProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ClothingCategory>('tops');
   const [subcategory, setSubcategory] = useState<string>('');
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
   const [description, setDescription] = useState('');
+  const [brand, setBrand] = useState('');
   const [imageData, setImageData] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [converting, setConverting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const categoryOptions = getMergedCategoryOptions(customMainTags);
 
   const handleFile = async (file: File) => {
     setFileError(null);
@@ -94,6 +98,7 @@ export function UploadModal({ open, onClose, onUpload }: UploadModalProps) {
       subcategory: subcategory && subcategory !== 'none' ? subcategory : undefined,
       customTags: customTags.length > 0 ? customTags : undefined,
       description: description.trim() || undefined,
+      brand: brand.trim() || undefined,
       imageData,
     });
     reset();
@@ -106,13 +111,14 @@ export function UploadModal({ open, onClose, onUpload }: UploadModalProps) {
     setCustomTags([]);
     setNewTag('');
     setDescription('');
+    setBrand('');
     setImageData(null);
     setFileError(null);
     setConverting(false);
     onClose();
   };
 
-  const availableSubs = SUBCATEGORIES[category] || [];
+  const availableSubs = getCategorySubcategories(category, customMainTags);
 
   return (
     <AnimatePresence>
@@ -198,9 +204,9 @@ export function UploadModal({ open, onClose, onUpload }: UploadModalProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORY_ORDER.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
+                  {categoryOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -220,6 +226,14 @@ export function UploadModal({ open, onClose, onUpload }: UploadModalProps) {
                   </SelectContent>
                 </Select>
               )}
+
+              {/* Brand — optional text input */}
+              <Input
+                placeholder="Brand (optional)"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                className="rounded-xl bg-background"
+              />
 
               {/* Custom tags */}
               <div>

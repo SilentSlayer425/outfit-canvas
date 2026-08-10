@@ -8,7 +8,7 @@
  *  - Change DB_NAME / STORE_NAME in src/lib/closet-storage.ts to rename local storage buckets
  */
 import { useState, useEffect, useCallback } from 'react';
-import type { ClothingItem, Outfit, ClothingCategory } from '@/types/closet';
+import type { ClothingItem, Outfit, ClothingCategory, CustomMainTag, ClosetState } from '@/types/closet';
 import {
   clearLegacyClosetState,
   readClosetState,
@@ -19,6 +19,7 @@ import {
 export function useCloset() {
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [outfits, setOutfits] = useState<Outfit[]>([]);
+  const [customMainTags, setCustomMainTags] = useState<CustomMainTag[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -28,9 +29,10 @@ export function useCloset() {
       try {
         const stored = await readClosetState();
 
-        if (!cancelled && (stored.items.length > 0 || stored.outfits.length > 0)) {
+        if (!cancelled && (stored.items.length > 0 || stored.outfits.length > 0 || (stored.customMainTags?.length ?? 0) > 0)) {
           setItems(stored.items);
           setOutfits(stored.outfits);
+          setCustomMainTags(stored.customMainTags ?? []);
           setReady(true);
           return;
         }
@@ -42,11 +44,12 @@ export function useCloset() {
       if (!cancelled) {
         setItems(legacy.items);
         setOutfits(legacy.outfits);
+        setCustomMainTags(legacy.customMainTags ?? []);
         setReady(true);
       }
 
       if (legacy.items.length > 0 || legacy.outfits.length > 0) {
-        writeClosetState(legacy)
+        writeClosetState({ items: legacy.items, outfits: legacy.outfits, customMainTags: legacy.customMainTags ?? [] })
           .then(() => clearLegacyClosetState())
           .catch((error) => console.error('Failed to migrate legacy closet state:', error));
       }
@@ -62,10 +65,10 @@ export function useCloset() {
   useEffect(() => {
     if (!ready) return;
 
-    writeClosetState({ items, outfits }).catch((error) => {
+    writeClosetState({ items, outfits, customMainTags }).catch((error) => {
       console.error('Failed to persist closet state:', error);
     });
-  }, [items, outfits, ready]);
+  }, [items, outfits, customMainTags, ready]);
 
   const addItem = useCallback((item: Omit<ClothingItem, 'id' | 'createdAt'>) => {
     const newItem: ClothingItem = { ...item, id: crypto.randomUUID(), createdAt: Date.now() };
@@ -73,7 +76,7 @@ export function useCloset() {
     return newItem;
   }, []);
 
-  const updateItem = useCallback((id: string, updates: Partial<Pick<ClothingItem, 'name' | 'category' | 'subcategory' | 'customTags' | 'description'>>) => {
+  const updateItem = useCallback((id: string, updates: Partial<Pick<ClothingItem, 'name' | 'category' | 'subcategory' | 'customTags' | 'description' | 'brand'>>) => {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...updates } : i)));
   }, []);
 
@@ -98,14 +101,51 @@ export function useCloset() {
 
   const getItemById = useCallback((id: string) => items.find((i) => i.id === id), [items]);
 
-  const replaceAll = useCallback((newItems: ClothingItem[], newOutfits: Outfit[]) => {
+  const replaceAll = useCallback((newItems: ClothingItem[], newOutfits: Outfit[], newCustomMainTags?: CustomMainTag[]) => {
     setItems(newItems);
     setOutfits(newOutfits);
+    if (newCustomMainTags) {
+      setCustomMainTags(newCustomMainTags);
+    }
   }, []);
+
+  const addCustomTag = useCallback((label: string, options?: { defaultX?: number; defaultY?: number; subcategories?: string[] }) => {
+    const newTag: CustomMainTag = {
+      id: crypto.randomUUID(),
+      label,
+      createdAt: Date.now(),
+      ...options,
+    };
+    setCustomMainTags((prev) => [newTag, ...prev]);
+    return newTag;
+  }, []);
+
+  const deleteCustomTag = useCallback((id: string) => {
+    setCustomMainTags((prev) => prev.filter((tag) => tag.id !== id));
+  }, []);
+
+  const duplicateItem = useCallback((itemId: string, customizations?: { name?: string; description?: string }) => {
+    const original = items.find((i) => i.id === itemId);
+    if (!original) return null;
+
+    const newItem: ClothingItem = {
+      ...original,
+      id: crypto.randomUUID(),
+      duplicatedFromId: original.id,
+      isDuplicate: true,
+      name: customizations?.name !== undefined ? customizations.name : original.name,
+      description: customizations?.description !== undefined ? customizations.description : original.description,
+      createdAt: Date.now(),
+    };
+
+    setItems((prev) => [newItem, ...prev]);
+    return newItem.id;
+  }, [items]);
 
   return {
     items,
     outfits,
+    customMainTags,
     ready,
     addItem,
     updateItem,
@@ -115,5 +155,8 @@ export function useCloset() {
     removeOutfit,
     getItemById,
     replaceAll,
+    duplicateItem,
+    addCustomTag,
+    deleteCustomTag,
   };
 }

@@ -8,15 +8,16 @@
  */
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { DRIVE_FOLDER_NAME, DRIVE_DATA_FILE } from '@/config';
-import type { ClothingItem, Outfit } from '@/types/closet';
+import type { ClothingItem, Outfit, CustomMainTag } from '@/types/closet';
 
 interface DriveData {
   items: ClothingItem[];
   outfits: Outfit[];
+  customMainTags?: CustomMainTag[];
   darkMode?: boolean;
   weatherCity?: string;
-  weatherLat?: number; // add
-  weatherLon?: number; // add
+  weatherLat?: number;
+  weatherLon?: number;
 }
 
 interface DriveQueryOptions {
