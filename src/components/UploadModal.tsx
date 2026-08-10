@@ -227,13 +227,6 @@ export function UploadModal({ open, onClose, customMainTags = [], onUpload }: Up
                 </Select>
               )}
 
-              {/* Brand — optional text input */}
-              <Input
-                placeholder="Brand (optional)"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                className="rounded-xl bg-background"
-              />
 
               {/* Custom tags */}
               <div>
