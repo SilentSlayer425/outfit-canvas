@@ -14,14 +14,15 @@
  */
 import { useState, useMemo, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, Pencil, Copy } from 'lucide-react';
-import type { ClothingItem, ClothingCategory, CustomMainTag } from '@/types/closet';
+import { Trash2, Pencil, Copy, Link2 } from 'lucide-react';
+import type { ClothingItem, ClothingCategory, CustomMainTag, Outfit } from '@/types/closet';
 import { CATEGORY_LABELS, CATEGORY_ORDER, SUBCATEGORIES } from '@/types/closet';
 import { GRID_COLS, GRID_ITEM_STAGGER } from '@/config';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getMergedCategoryOrder, getCategoryLabel } from '@/lib/category-helpers';
+import { isItemPaired } from '@/lib/pairing-helpers';
 
 interface ClothingGridProps {
   items: ClothingItem[];
@@ -35,10 +36,11 @@ interface ClothingGridProps {
   selectable?: boolean;
   showItemHoverText?: boolean;
   customMainTags?: CustomMainTag[];
+  outfits?: Outfit[];
 }
 
 export function ClothingGrid({
-  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, onDuplicate, selectable, showItemHoverText, customMainTags = [],
+  items, activeCategory, onCategoryChange, onRemove, onSelect, onEdit, onView, onDuplicate, selectable, showItemHoverText, customMainTags = [], outfits = [],
 }: ClothingGridProps) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [activeBrand, setActiveBrand] = useState<string | null>(null);
@@ -196,8 +198,21 @@ export function ClothingGrid({
               }}
             >
               {/* Image container */}
-              <div className="aspect-square p-2">
+              <div className="aspect-square p-2 relative">
                 <img src={item.imageData} alt={item.name} className="w-full h-full object-contain" />
+                {/* Pairing icon badge */}
+                {isItemPaired(item.id, outfits) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="absolute top-3 right-3 p-1.5 rounded-full bg-primary/90 text-primary-foreground">
+                        <Link2 className="w-3.5 h-3.5" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" align="start">
+                      This item is linked with another
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
               <div className="px-3 pb-3">
                 <p className="text-sm font-medium text-foreground truncate">{item.name}</p>

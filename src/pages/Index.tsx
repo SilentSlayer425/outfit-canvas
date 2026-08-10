@@ -24,6 +24,7 @@ import type { Tab } from '@/components/AppNav';
 import { UploadModal } from '@/components/UploadModal';
 import { EditItemModal } from '@/components/EditItemModal';
 import { ItemDetailModal } from '@/components/ItemDetailModal';
+import { AddCategoryModal } from '@/components/AddCategoryModal';
 import { ClothingGrid } from '@/components/ClothingGrid';
 import { OutfitCanvas } from '@/components/OutfitCanvas';
 import { RearCanvas } from '@/components/RearCanvas';
@@ -51,12 +52,13 @@ interface IndexProps {
 }
 
 export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDarkMode }: IndexProps) {
-  const { items, outfits, customMainTags, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll, duplicateItem } = useCloset();
+  const { items, outfits, customMainTags, ready, addItem, updateItem, removeItem, saveOutfit, removeOutfit, getItemById, replaceAll, duplicateItem, addCustomTag } = useCloset();
   const { saveToDrive, loadFromDrive, syncing, lastSync } = useGoogleDrive(user.accessToken);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>((searchParams.get('tab') as Tab) || 'closet');  const [uploadOpen, setUploadOpen] = useState(false);
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [editItem, setEditItem] = useState<ClothingItem | null>(null);
   const [viewItem, setViewItem] = useState<ClothingItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<ClothingCategory | 'all'>('all');
@@ -107,7 +109,17 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
   }, [items, outfits, customMainTags, weatherCity, weatherLat, weatherLon, darkMode, saveToDrive, ready]);
 
   const handleUpload = useCallback((data: { name: string; category: ClothingCategory; subcategory?: string; customTags?: string[]; description?: string; brand?: string; imageData: string }) => {
-    addItem(data);
+    // Explicitly structure data to match addItem parameter type
+    const itemData: Omit<ClothingItem, 'id' | 'createdAt'> = {
+      name: data.name,
+      category: data.category,
+      imageData: data.imageData,
+      ...(data.subcategory && { subcategory: data.subcategory }),
+      ...(data.customTags && { customTags: data.customTags }),
+      ...(data.description && { description: data.description }),
+      ...(data.brand && { brand: data.brand }),
+    };
+    addItem(itemData);
   }, [addItem]);
 
   const addToOutfit = useCallback((item: ClothingItem) => {
@@ -192,6 +204,12 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
     }
   }, [duplicateItem, items]);
 
+  const handleCreateCategory = useCallback((label: string) => {
+    // Default positions: center X, slightly above center Y for custom categories
+    addCustomTag(label, { defaultX: 0, defaultY: -80 });
+    toast.success(`Category '${label}' created`);
+  }, [addCustomTag]);
+
   const headerTitle: Record<Tab, string> = {
     home: 'Home',
     closet: 'My Closet',
@@ -236,9 +254,14 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
               )}
             </button>
             {tab === 'closet' && (
-              <Button onClick={() => setUploadOpen(true)} className="gap-2 rounded-xl" size="sm">
-                <Plus className="h-4 w-4" /> Add<span className="hidden sm:inline"> Item</span>
-              </Button>
+              <>
+                <Button onClick={() => setAddCategoryOpen(true)} variant="outline" className="gap-2 rounded-xl" size="sm">
+                  <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Category</span>
+                </Button>
+                <Button onClick={() => setUploadOpen(true)} className="gap-2 rounded-xl" size="sm">
+                  <Plus className="h-4 w-4" /> Add<span className="hidden sm:inline"> Item</span>
+                </Button>
+              </>
             )}
             {/* Profile avatar — opens dropdown menu */}
             <div className="relative">
@@ -314,6 +337,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                 onView={setViewItem}
                 onDuplicate={handleDuplicateItem}
                 customMainTags={customMainTags}
+                outfits={outfits}
               />
             </motion.div>
           )}
@@ -377,6 +401,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       selectable
                       showItemHoverText
                       customMainTags={customMainTags}
+                      outfits={outfits}
                     />
                   </div>
                 </div>
@@ -410,6 +435,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
                       selectable
                       showItemHoverText
                       customMainTags={customMainTags}
+                      outfits={outfits}
                     />
                   </div>
                   <div className="w-1/3 flex flex-col gap-4 sticky top-24 self-start h-fit">
@@ -456,6 +482,7 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
       </main>
 
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} customMainTags={customMainTags} onUpload={handleUpload} />
+      <AddCategoryModal open={addCategoryOpen} onClose={() => setAddCategoryOpen(false)} onCreate={handleCreateCategory} />
       <EditItemModal open={!!editItem} item={editItem} onClose={() => setEditItem(null)} customMainTags={customMainTags} onSave={updateItem} />
       <ItemDetailModal
         open={!!viewItem}
@@ -463,6 +490,9 @@ export default function Index({ user, onSignOut, darkMode, setDarkMode, toggleDa
         onClose={() => setViewItem(null)}
         onEdit={(item) => { setViewItem(null); setEditItem(item); }}
         onDelete={(item) => { setViewItem(null); removeItem(item.id); }}
+        outfits={outfits}
+        allItems={items}
+        onViewPairedItem={setViewItem}
       />
       <ConfirmDialog
         open={confirmDeleteAll}
